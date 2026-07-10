@@ -1,0 +1,47 @@
+<form class="niks-tt-color-config">
+  <div class="scroll-region">
+    <table class="niks-tt-color-table">
+      <thead>
+        <tr>
+          <th class="niks-tt-col-letter">{{localize "niks-token-tags.colorConfig.letterHeader"}}</th>
+          <th class="niks-tt-col-color">{{localize "niks-token-tags.colorConfig.bgColorHeader"}}</th>
+          <th class="niks-tt-col-hex">{{localize "niks-token-tags.colorConfig.bgHexHeader"}}</th>
+          <th class="niks-tt-col-color">{{localize "niks-token-tags.colorConfig.textColorHeader"}}</th>
+          <th class="niks-tt-col-hex">{{localize "niks-token-tags.colorConfig.textHexHeader"}}</th>
+          <th class="niks-tt-col-preview">{{localize "niks-token-tags.colorConfig.previewHeader"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each letters}}
+        <tr>
+          <td class="niks-tt-col-letter">
+            <strong>{{letter}}</strong>
+          </td>
+          <td class="niks-tt-col-color">
+            <input type="color" value="{{bg}}" data-letter="{{letter}}" data-field="bg" />
+          </td>
+          <td class="niks-tt-col-hex">
+            <input type="text" value="{{bg}}" data-letter="{{letter}}" data-field="bg" maxlength="7" />
+          </td>
+          <td class="niks-tt-col-color">
+            <input type="color" value="{{text}}" data-letter="{{letter}}" data-field="text" />
+          </td>
+          <td class="niks-tt-col-hex">
+            <input type="text" value="{{text}}" data-letter="{{letter}}" data-field="text" maxlength="7" />
+          </td>
+          <td class="niks-tt-col-preview">
+            {{#if iconDataUrl}}
+            <img src="{{iconDataUrl}}" class="niks-tt-preview-icon" alt="{{letter}}" />
+            {{/if}}
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  <div class="niks-tt-bottom-buttons">
+    <button type="button" id="niks-tt-reset-defaults">
+      <i class="fas fa-undo"></i> {{localize "niks-token-tags.colorConfig.resetDefaults"}}
+    </button>
+  </div>
+</form>

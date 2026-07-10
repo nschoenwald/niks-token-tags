@@ -1,0 +1,114 @@
+/* ==========================================================================
+   Nik's Token Tags — Styles
+   ========================================================================== */
+
+/* ----- Color Config Settings Form ----- */
+
+.niks-tt-color-config {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.niks-tt-color-config .scroll-region {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.niks-tt-color-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.niks-tt-color-table thead th {
+  font-weight: bold;
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 2px solid var(--color-border-light-tertiary, #999);
+  position: sticky;
+  top: 0;
+  background: var(--color-base, var(--color-bg, #1a1a2e));
+  z-index: 1;
+}
+
+.niks-tt-color-table tbody tr {
+  border-bottom: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.1));
+}
+
+.niks-tt-color-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.niks-tt-color-table td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+
+/* Column widths */
+.niks-tt-col-letter {
+  width: 40px;
+  text-align: center;
+}
+
+.niks-tt-col-color {
+  width: 50px;
+}
+
+/* Color picker inputs — visible border so white/light colors don't disappear */
+.niks-tt-col-color input[type="color"] {
+  width: 40px;
+  height: 28px;
+  padding: 2px;
+  border: 2px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.3));
+  border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.niks-tt-col-color input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.niks-tt-col-color input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 2px;
+}
+
+.niks-tt-col-hex {
+  width: 80px;
+}
+
+.niks-tt-col-hex input[type="text"] {
+  width: 72px;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+
+.niks-tt-col-preview {
+  width: 40px;
+  text-align: center;
+}
+
+.niks-tt-preview-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+/* Bottom buttons */
+.niks-tt-bottom-buttons {
+  border-top: 1px solid var(--color-border-light-tertiary, rgba(255, 255, 255, 0.2));
+  padding-top: 8px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+}
+
+.niks-tt-bottom-buttons button {
+  flex: 0 0 auto;
+}
