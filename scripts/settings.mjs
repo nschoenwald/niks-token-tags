@@ -38,6 +38,7 @@ export class Settings {
   static RESTORE_ON_COMBAT_END = 'restoreOnCombatEnd';
   static ICON_DIRECTORY = 'iconDirectory';
   static COLORS = 'colors';
+  static DEBUG = 'debug';
 
   /**
    * Register all module settings.
@@ -70,6 +71,15 @@ export class Settings {
       type: String,
       default: 'assets/niks-token-tags',
       requiresReload: true,
+    });
+
+    game.settings.register(MODULE, this.DEBUG, {
+      name: `${MODULE}.settings.debug.Name`,
+      hint: `${MODULE}.settings.debug.Hint`,
+      scope: 'client',
+      config: true,
+      type: Boolean,
+      default: false,
     });
 
     game.settings.register(MODULE, this.COLORS, {

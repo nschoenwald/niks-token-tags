@@ -2,6 +2,10 @@
 
 ## 14.0.1
 
+### Features
+
+- Added a client-scoped "Debug Logging" setting (defaulting to off) to gate console logs.
+
 ### Bug Fixes
 
 - When a token already has a letter suffix, the module now correctly detects and uses that suffix, ensuring the correct active effect is applied and removing any mismatching active effects to prevent double-applying letters.

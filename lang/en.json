@@ -17,6 +17,10 @@
         "Name": "Letter Color Settings",
         "Label": "Configure Colors",
         "Hint": "Customize the background and text colors used for each letter marker."
+      },
+      "debug": {
+        "Name": "Debug Logging",
+        "Hint": "Enable verbose console logging. Useful for troubleshooting."
       }
     },
     "colorConfig": {

@@ -12,5 +12,10 @@ export const FLAGS = {
  * @param  {...any} args
  */
 export function log(...args) {
+  try {
+    if (!game?.settings?.get(MODULE, 'debug')) return;
+  } catch (e) {
+    return; // Don't log if settings aren't initialized yet
+  }
   console.log(`${MODULE} |`, ...args);
 }
