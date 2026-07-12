@@ -3,11 +3,16 @@ import { Settings } from './settings.mjs';
 import { ColorConfig } from './color-config.mjs';
 import { IconGenerator } from './icon-generator.mjs';
 import { CombatMarker } from './combat-marker.mjs';
+import { Compatibility } from './compat.mjs';
 
 log('Module loaded.');
 
 Hooks.once('init', () => {
   Settings.registerSettings(ColorConfig);
+});
+
+Hooks.once('setup', () => {
+  Compatibility.init();
 });
 
 Hooks.once('ready', async () => {

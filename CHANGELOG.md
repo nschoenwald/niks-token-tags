@@ -1,5 +1,12 @@
 # Changelog
 
+## 14.0.1
+
+### Bug Fixes
+
+- When a token already has a letter suffix, the module now correctly detects and uses that suffix, ensuring the correct active effect is applied and removing any mismatching active effects to prevent double-applying letters.
+- **Compatibility:** Added a built-in patch for the `hide-npc-names` module so that letter suffixes are preserved alongside hidden names on the canvas, in the combat tracker, and in chat messages.
+
 ## 14.0.0
 
 Initial release.

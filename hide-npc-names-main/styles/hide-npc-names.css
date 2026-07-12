@@ -1,0 +1,8 @@
+.hide-name .hide-icon {
+  width: 1.5rem;
+}
+
+.directory-item .hide-name {
+  flex: 0;
+  padding-right: 0.5em;
+}

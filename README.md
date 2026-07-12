@@ -17,6 +17,7 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 - **Foundry VTT:** V13 – V14
 - **Game System:** DnD5e 5.2+ (with system-agnostic fallback for other systems)
+- **Module Integrations:** Includes a built-in compatibility patch for the `hide-npc-names` module so that letter suffixes remain visible alongside hidden names.
 
 ## Installation
 

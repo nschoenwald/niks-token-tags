@@ -177,23 +177,57 @@ export class CombatMarker {
   // Suffix Management
   // ---------------------------------------------------------------------------
 
-  /**
-   * Apply alphabetical suffixes (A, B, C…) to a group of combatants sharing the same actor.
-   * Preserves existing suffix assignments — only assigns letters to combatants that don't have one.
-   * @param {Combatant[]} group
-   */
   static async _applySuffixesToGroup(group) {
-    // Collect already-assigned letters
     const usedLetters = new Set();
+    const unassigned = [];
+
+    // First pass: identify tokens that already have a letter suffix or flag
     for (const combatant of group) {
-      const letter = combatant.getFlag(MODULE, FLAGS.COMBAT_LETTER);
-      if (letter) usedLetters.add(letter);
+      const tokenDoc = combatant.token;
+      if (!tokenDoc) continue;
+
+      const nameMatch = tokenDoc.name.match(/^(.*) ([A-Z])$/);
+
+      if (nameMatch) {
+        // Token has a letter suffix in its name
+        const baseName = nameMatch[1];
+        const letter = nameMatch[2];
+        usedLetters.add(letter);
+
+        const flagLetter = combatant.getFlag(MODULE, FLAGS.COMBAT_LETTER);
+        const originalName = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
+
+        // Update flags if they don't match the current name suffix
+        if (flagLetter !== letter || originalName !== baseName) {
+          await combatant.update({
+            [`flags.${MODULE}.${FLAGS.ORIGINAL_NAME}`]: baseName,
+            [`flags.${MODULE}.${FLAGS.COMBAT_LETTER}`]: letter,
+          });
+        }
+
+        // Check if the actor has the correct active effect and no mismatched ones
+        const actor = combatant.actor;
+        if (actor) {
+          const effects = actor.effects.filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER));
+          const hasCorrectEffect = effects.some(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER) === letter);
+          const hasMismatchingEffect = effects.some(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER) !== letter);
+
+          if (!hasCorrectEffect || hasMismatchingEffect) {
+            await this._applyLetterEffect(combatant, letter);
+          }
+        }
+      } else {
+        const flagLetter = combatant.getFlag(MODULE, FLAGS.COMBAT_LETTER);
+        if (flagLetter) {
+          usedLetters.add(flagLetter);
+        } else {
+          unassigned.push(combatant);
+        }
+      }
     }
 
     // Sort unassigned combatants by ID (proxy for creation order) for stable assignment
-    const unassigned = group
-      .filter(c => !c.getFlag(MODULE, FLAGS.COMBAT_LETTER))
-      .sort((a, b) => a.id.localeCompare(b.id));
+    unassigned.sort((a, b) => a.id.localeCompare(b.id));
 
     if (unassigned.length === 0) return;
 
