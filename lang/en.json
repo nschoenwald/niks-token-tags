@@ -5,6 +5,10 @@
         "Name": "Enable Token Tags",
         "Hint": "Automatically rename duplicate NPC tokens in combat with alphabetical suffixes and apply color-coded effects."
       },
+      "uniqueLetters": {
+        "Name": "Unique Letters Globally",
+        "Hint": "When enabled, assigns unique letters across all types of NPCs in the combat (e.g., Goblin A, Hobgoblin B). When disabled, letters are per-actor type (e.g., Goblin A, Hobgoblin A)."
+      },
       "restoreOnCombatEnd": {
         "Name": "Restore Names on Combat End",
         "Hint": "When combat is deleted, restore original token names and remove letter effects."

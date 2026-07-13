@@ -74,9 +74,14 @@ export class CombatMarker {
     const actorId = combatant.actorId;
     if (!actorId) return;
 
-    // Get remaining combatants with the same actor (excluding the deleted one)
-    const remaining = this._getActorGroup(combat, actorId)
-      .filter(c => c.id !== combatant.id);
+    // Get remaining combatants
+    let remaining;
+    const isGlobal = game.settings.get(MODULE, Settings.UNIQUE_LETTERS);
+    if (isGlobal) {
+      remaining = combat.combatants.filter(c => c.id !== combatant.id && this._isNPC(c));
+    } else {
+      remaining = this._getActorGroup(combat, actorId).filter(c => c.id !== combatant.id);
+    }
 
     if (remaining.length === 0) return;
 
@@ -151,20 +156,29 @@ export class CombatMarker {
     this._processingLock.add(combat.id);
 
     try {
-      // Group all NPC combatants by actorId
-      const actorGroups = new Map();
-      for (const combatant of combat.combatants) {
-        if (!this._isNPC(combatant)) continue;
-        const actorId = combatant.actorId;
-        if (!actorId) continue;
-        if (!actorGroups.has(actorId)) actorGroups.set(actorId, []);
-        actorGroups.get(actorId).push(combatant);
-      }
+      const isGlobal = game.settings.get(MODULE, Settings.UNIQUE_LETTERS);
 
-      // Process each group that has 2+ members
-      for (const [actorId, group] of actorGroups) {
-        if (group.length < 2) continue;
-        await this._applySuffixesToGroup(group);
+      if (isGlobal) {
+        const allNpcs = combat.combatants.filter(c => this._isNPC(c));
+        if (allNpcs.length >= 2) {
+          await this._applySuffixesToGroup(allNpcs);
+        }
+      } else {
+        // Group all NPC combatants by actorId
+        const actorGroups = new Map();
+        for (const combatant of combat.combatants) {
+          if (!this._isNPC(combatant)) continue;
+          const actorId = combatant.actorId;
+          if (!actorId) continue;
+          if (!actorGroups.has(actorId)) actorGroups.set(actorId, []);
+          actorGroups.get(actorId).push(combatant);
+        }
+
+        // Process each group that has 2+ members
+        for (const [actorId, group] of actorGroups) {
+          if (group.length < 2) continue;
+          await this._applySuffixesToGroup(group);
+        }
       }
     } catch (error) {
       console.error(`${MODULE} | Error processing combat groups:`, error);

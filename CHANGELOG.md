@@ -1,6 +1,9 @@
 # Changelog
 
-## 14.0.1
+## 14.0.2
+* Add a new setting (default on) that gives unique letters across all types of actors. Example: Goblin A, Goblin B, Hobgoblin C, Hobgoblin D, Hobgoblin E.
+
+# 14.0.1
 
 ### Features
 
