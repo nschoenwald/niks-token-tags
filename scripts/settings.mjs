@@ -36,6 +36,7 @@ export const DEFAULT_COLORS = {
 export class Settings {
   static ENABLED = 'enabled';
   static UNIQUE_LETTERS = 'uniqueLetters';
+  static INCLUDE_SINGLETONS = 'includeSingletons';
   static RESTORE_ON_COMBAT_END = 'restoreOnCombatEnd';
   static ICON_DIRECTORY = 'iconDirectory';
   static COLORS = 'colors';
@@ -58,6 +59,15 @@ export class Settings {
     game.settings.register(MODULE, this.UNIQUE_LETTERS, {
       name: `${MODULE}.settings.uniqueLetters.Name`,
       hint: `${MODULE}.settings.uniqueLetters.Hint`,
+      scope: 'world',
+      config: true,
+      type: Boolean,
+      default: true,
+    });
+
+    game.settings.register(MODULE, this.INCLUDE_SINGLETONS, {
+      name: `${MODULE}.settings.includeSingletons.Name`,
+      hint: `${MODULE}.settings.includeSingletons.Hint`,
       scope: 'world',
       config: true,
       type: Boolean,

@@ -74,20 +74,15 @@ export class CombatMarker {
     const actorId = combatant.actorId;
     if (!actorId) return;
 
-    // Get remaining combatants
-    let remaining;
-    const isGlobal = game.settings.get(MODULE, Settings.UNIQUE_LETTERS);
-    if (isGlobal) {
-      remaining = combat.combatants.filter(c => c.id !== combatant.id && this._isNPC(c));
-    } else {
-      remaining = this._getActorGroup(combat, actorId).filter(c => c.id !== combatant.id);
-    }
+    // Get remaining combatants with the same actor (excluding the deleted one)
+    const remainingForActor = this._getActorGroup(combat, actorId)
+      .filter(c => c.id !== combatant.id);
 
-    if (remaining.length === 0) return;
+    const includeSingletons = game.settings.get(MODULE, Settings.INCLUDE_SINGLETONS);
 
-    if (remaining.length === 1) {
-      // Only one left — remove its suffix and effect
-      await this._removeSuffix(remaining[0]);
+    if (remainingForActor.length === 1 && !includeSingletons) {
+      // Only one left of this type, and we don't letter singletons
+      await this._removeSuffix(remainingForActor[0]);
     }
     // If 2+ remain, keep their existing suffixes for stability (no re-lettering mid-combat)
   }
@@ -157,26 +152,40 @@ export class CombatMarker {
 
     try {
       const isGlobal = game.settings.get(MODULE, Settings.UNIQUE_LETTERS);
+      const includeSingletons = game.settings.get(MODULE, Settings.INCLUDE_SINGLETONS);
+
+      // Group all NPC combatants by actorId
+      const actorGroups = new Map();
+      for (const combatant of combat.combatants) {
+        if (!this._isNPC(combatant)) continue;
+        const actorId = combatant.actorId;
+        if (!actorId) continue;
+        if (!actorGroups.has(actorId)) actorGroups.set(actorId, []);
+        actorGroups.get(actorId).push(combatant);
+      }
+
+      const groupsToProcess = [];
+      const singletonsToRemove = [];
+
+      for (const group of actorGroups.values()) {
+        if (group.length === 1 && !includeSingletons) {
+          singletonsToRemove.push(group[0]);
+        } else if (group.length > 0) {
+          groupsToProcess.push(group);
+        }
+      }
+
+      for (const combatant of singletonsToRemove) {
+        await this._removeSuffix(combatant);
+      }
 
       if (isGlobal) {
-        const allNpcs = combat.combatants.filter(c => this._isNPC(c));
-        if (allNpcs.length >= 2) {
-          await this._applySuffixesToGroup(allNpcs);
+        const allNpcsToProcess = groupsToProcess.flat();
+        if (allNpcsToProcess.length > 0) {
+          await this._applySuffixesToGroup(allNpcsToProcess);
         }
       } else {
-        // Group all NPC combatants by actorId
-        const actorGroups = new Map();
-        for (const combatant of combat.combatants) {
-          if (!this._isNPC(combatant)) continue;
-          const actorId = combatant.actorId;
-          if (!actorId) continue;
-          if (!actorGroups.has(actorId)) actorGroups.set(actorId, []);
-          actorGroups.get(actorId).push(combatant);
-        }
-
-        // Process each group that has 2+ members
-        for (const [actorId, group] of actorGroups) {
-          if (group.length < 2) continue;
+        for (const group of groupsToProcess) {
           await this._applySuffixesToGroup(group);
         }
       }
