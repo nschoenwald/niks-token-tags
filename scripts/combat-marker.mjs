@@ -408,9 +408,19 @@ export class CombatMarker {
     const actor = combatant.actor;
     if (!actor) return false;
 
-    // DnD5e-specific: check actor type
+    // DnD5e
     if (game.system.id === 'dnd5e') {
       return actor.type === 'npc';
+    }
+
+    // PF2e
+    if (game.system.id === 'pf2e') {
+      return ['npc', 'hazard', 'vehicle'].includes(actor.type);
+    }
+
+    // Shadowdark
+    if (game.system.id === 'shadowdark') {
+      return ['npc', 'monster'].includes(actor.type?.toLowerCase());
     }
 
     // System-agnostic fallback: not player-owned

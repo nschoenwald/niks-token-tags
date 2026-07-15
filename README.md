@@ -11,12 +11,12 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 - **Suffix cleanup** — If all but one duplicate is removed from combat, the remaining token's suffix and effect are automatically removed.
 - **Optional name restoration** — A world setting allows restoring original token names when combat ends (enabled by default).
 - **Customizable colors** — All 26 letter colors (background + text) can be configured per-world via the module settings.
-- **DnD5e + system-agnostic** — Uses `actor.type === "npc"` for DnD5e, falls back to `!combatant.hasPlayerOwner` for other systems.
+- **System-agnostic** — Has dedicated support for DnD5e, PF2e, and Shadowdark to accurately detect NPCs, and falls back to checking `!combatant.hasPlayerOwner` for all other systems.
 
 ## Compatibility
 
 - **Foundry VTT:** V13 – V14
-- **Game System:** DnD5e 5.2+ (with system-agnostic fallback for other systems)
+- **Game System:** System-agnostic (Dedicated support for DnD5e, PF2e, and Shadowdark)
 - **Module Integrations:** Includes a built-in compatibility patch for the `hide-npc-names` module so that letter suffixes remain visible alongside hidden names.
 
 ## Installation

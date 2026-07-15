@@ -1,5 +1,12 @@
 # Changelog
 
+## 14.1.0
+
+### Features
+
+* Made the module system-agnostic by removing the strict dependency on `dnd5e`.
+* Added dedicated support for Pathfinder 2e (`pf2e`) and Shadowdark (`shadowdark`) to accurately detect their NPC actor types.
+
 ## 14.0.2
 
 ### Features
