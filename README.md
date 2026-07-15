@@ -2,6 +2,8 @@
 
 A [Foundry VTT](https://foundryvtt.com/) module that automatically renames duplicate NPC tokens in combat with alphabetical suffixes and applies color-coded letter effects for easy identification.
 
+<img width="1207" height="624" alt="image" src="https://github.com/user-attachments/assets/6a2663d9-35eb-4951-a734-2fcdde2e8a3f" />
+
 ## Features
 
 - **Automatic alphabetical suffixes** — When two or more tokens of the same NPC actor are in combat, they are renamed with letter suffixes (e.g., "Goblin A", "Goblin B", "Goblin C").
