@@ -5,8 +5,10 @@
 ### Bug Fixes
 
 * Suppressed scrolling status text when applying or removing letter effects.
-* Ensured same enemy types are grouped together sequentially when "Unique letters globally" is enabled (e.g., Bugbear A, Bugbear B, Goblin C, Goblin D).
 
+### Improvements
+
+* Ensured same enemy types are grouped together sequentially when "Unique letters globally" is enabled (e.g., Bugbear A, Bugbear B, Goblin C, Goblin D).
 
 ## 14.1.0
 
