@@ -124,7 +124,7 @@ export class CombatMarker {
             .filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER))
             .map(e => e.id);
           if (effectIds.length > 0) {
-            await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds);
+            await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds, { animate: false });
           }
         } catch (e) {
           console.warn(`${MODULE} | Could not remove letter effects:`, e);
@@ -249,8 +249,16 @@ export class CombatMarker {
       }
     }
 
-    // Sort unassigned combatants by ID (proxy for creation order) for stable assignment
-    unassigned.sort((a, b) => a.id.localeCompare(b.id));
+    // Sort unassigned combatants by Actor Name (to group same types together), 
+    // then by ID (proxy for creation order) for stable assignment
+    unassigned.sort((a, b) => {
+      const nameA = a.actor?.name || '';
+      const nameB = b.actor?.name || '';
+      if (nameA !== nameB) {
+        return nameA.localeCompare(nameB);
+      }
+      return a.id.localeCompare(b.id);
+    });
 
     if (unassigned.length === 0) return;
 
@@ -335,8 +343,8 @@ export class CombatMarker {
 
   /**
    * Apply a color-coded letter active effect to a combatant's token actor.
-   * Uses toggleStatusEffect (same approach as token-color-marker) which correctly
-   * sets up status effects for token display in both V13 and V14.
+   * Creates the effect directly instead of using toggleStatusEffect so we can pass { animate: false }
+   * and correctly suppress the scrolling text on application.
    * @param {Combatant} combatant
    * @param {string} letter
    */
@@ -350,29 +358,27 @@ export class CombatMarker {
     const statusId = `${MODULE}.${letter}`;
     const iconPath = IconGenerator.getEffectIconPath(letter);
 
-    // Temporarily register in CONFIG.statusEffects so toggleStatusEffect can find it
-    CONFIG.statusEffects.push({
-      id: statusId,
+    const effectData = {
       name: letter,
-      label: letter,
       img: iconPath,
-    });
-
-    try {
-      await actor.toggleStatusEffect(statusId, { overlay: false });
-      log(`Applied letter effect "${letter}" to actor "${actor.name}" with icon "${iconPath}"`);
-    } catch (error) {
-      console.error(`${MODULE} | Failed to toggle status effect for letter "${letter}":`, error);
-    } finally {
-      // Always clean up CONFIG.statusEffects to avoid global pollution
-      const configIdx = CONFIG.statusEffects.findIndex(e => e.id === statusId);
-      if (configIdx !== -1) CONFIG.statusEffects.splice(configIdx, 1);
+      statuses: [statusId],
+      flags: {
+        [MODULE]: {
+          [FLAGS.COMBAT_LETTER]: letter
+        }
+      }
+    };
+    
+    // V14+: Ensure the effect always displays on the token HUD even without a duration
+    if (globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON) {
+      effectData.showIcon = globalThis.CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS ?? 2;
     }
 
-    // Set our module flag on the newly created effect for later identification
-    const effect = actor.effects.find(e => e.statuses?.has(statusId));
-    if (effect) {
-      await effect.setFlag(MODULE, FLAGS.COMBAT_LETTER, letter);
+    try {
+      await actor.createEmbeddedDocuments('ActiveEffect', [effectData], { animate: false });
+      log(`Applied letter effect "${letter}" to actor "${actor.name}" with icon "${iconPath}"`);
+    } catch (error) {
+      console.error(`${MODULE} | Failed to create status effect for letter "${letter}":`, error);
     }
   }
 
@@ -390,7 +396,7 @@ export class CombatMarker {
       .map(e => e.id);
 
     if (effectIds.length > 0) {
-      await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds);
+      await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds, { animate: false });
     }
   }
 
