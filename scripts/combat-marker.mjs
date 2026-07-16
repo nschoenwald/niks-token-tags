@@ -209,7 +209,7 @@ export class CombatMarker {
       const tokenDoc = combatant.token;
       if (!tokenDoc) continue;
 
-      const nameMatch = tokenDoc.name.match(/^(.*) ([A-Z])$/);
+      const nameMatch = tokenDoc.name.match(/^(.*) \[([A-Z])\]$/);
 
       if (nameMatch) {
         // Token has a letter suffix in its name
@@ -291,7 +291,7 @@ export class CombatMarker {
     // Store the original name if not already stored
     const existingOriginal = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
     const baseName = existingOriginal ?? tokenDoc.name;
-    const newName = `${baseName} ${letter}`;
+    const newName = `${baseName} [${letter}]`;
 
     log(`Assigning suffix "${letter}" to "${baseName}" → "${newName}"`);
 

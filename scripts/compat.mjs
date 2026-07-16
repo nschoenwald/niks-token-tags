@@ -23,10 +23,37 @@ export class Compatibility {
   static init() {
     if (!game.modules.get('hide-npc-names')?.active) return;
 
+    this._patchHideNPCNamesChatCensoring();
     this._registerCanvasHooks();
     this._registerCombatTrackerHooks();
     this._registerChatHooks();
     log('Registered hide-npc-names compatibility hooks.');
+  }
+
+  /**
+   * Monkey-patches the `updateChatMessage` method of hide-npc-names.
+   * hide-npc-names splits the name by spaces and censors EACH word individually.
+   * If the name is "Goblin A", it will censor all "A"s in the chat message
+   * (e.g. "a pinch of sulfur").
+   * We wrap their method to strip our letter suffix from the `name` argument
+   * before their regex generation occurs.
+   */
+  static _patchHideNPCNamesChatCensoring() {
+    if (window.HideNPCNames && typeof window.HideNPCNames.updateChatMessage === 'function') {
+      const originalUpdate = window.HideNPCNames.updateChatMessage;
+      window.HideNPCNames.updateChatMessage = function(html, actor, name) {
+        let sanitizedName = name;
+        if (typeof name === 'string') {
+          // If the name ends with a space and bracketed letter, strip it
+          const match = name.match(/ \[([A-Z])\]$/);
+          if (match) {
+            sanitizedName = name.slice(0, -4);
+          }
+        }
+        return originalUpdate.call(this, html, actor, sanitizedName);
+      };
+      log('Patched HideNPCNames.updateChatMessage to prevent single-letter censoring.');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -51,7 +78,7 @@ export class Compatibility {
     const letter = this._getLetterFromRealName(token.document.__name);
     if (!letter) return;
 
-    const suffix = ` ${letter}`;
+    const suffix = ` [${letter}]`;
     if (!token.nameplate.text.endsWith(suffix)) {
       token.nameplate.text += suffix;
     }
@@ -154,7 +181,7 @@ export class Compatibility {
    */
   static _getLetterFromRealName(realName) {
     if (!realName || typeof realName !== 'string') return null;
-    const match = realName.match(/ ([A-Z])$/);
+    const match = realName.match(/ \[([A-Z])\]$/);
     return match ? match[1] : null;
   }
 
@@ -167,10 +194,11 @@ export class Compatibility {
   static _appendLetterToElement(el, letter) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let node;
+    const suffix = `[${letter}]`;
     while ((node = walker.nextNode())) {
       const text = node.textContent.trim();
-      if (text.length > 0 && !text.endsWith(letter)) {
-        node.textContent = `${node.textContent.trimEnd()} ${letter}`;
+      if (text.length > 0 && !text.endsWith(suffix)) {
+        node.textContent = `${node.textContent.trimEnd()} ${suffix}`;
         return;
       }
     }

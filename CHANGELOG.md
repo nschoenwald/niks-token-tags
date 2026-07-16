@@ -1,5 +1,15 @@
 # Changelog
 
+## 14.1.2
+
+### Features
+
+- Updated the default token suffix format from ` A` to ` [A]` (e.g. `Goblin [A]`). This bracketed format is a common convention and naturally prevents 3rd party modules like `hide-npc-names` from accidentally censoring single standalone letters in chat messages.
+
+### Bug Fixes
+
+- **Compatibility:** Prevented `hide-npc-names` from aggressively censoring single standalone letters (like the "A" in "A pinch of sulfur") in chat messages when the speaker token has a token tag suffix.
+
 ## 14.1.1
 
 ### Bug Fixes
