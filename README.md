@@ -11,25 +11,6 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 - **Foundry VTT:** V13 – V14
 - **Game System:** System-agnostic (Dedicated support for DnD5e, PF2e, and Shadowdark)
 - **Module Integrations:** Includes a built-in compatibility patch for the `hide-npc-names` module so that letter suffixes remain visible alongside hidden names.
-
----
-
-## Other Modules by Nik
-
-### 🎲 D&D 5e Specific
-* **[Nik's DnD5e Tweaks](https://github.com/nschoenwald/niks-dnd5e-tweaks)** – Consolidated collection of quality-of-life enhancements and combat automation tweaks for DnD5e.
-
-### ⚔️ Combat & Token Tools
-* **[Nik's Shared NPC Initiative](https://github.com/nschoenwald/niks-shared-npc-initiative)** – Groups NPCs of the same type in combat so they share a single initiative roll.
-* **[Nik's Movement Control](https://github.com/nschoenwald/niks-movement-control)** – GM controls to toggle player movement and automatically restrict/allow movement on combat start and end.
-* **[Nik's Tiny Change Logs](https://github.com/nschoenwald/niks-tiny-changelogs)** – Compact, single-line chat messages logging token HP and Temp HP changes.
-
-### ⚙️ Utilities & System Management
-* **[Nik's Settings Locks](https://github.com/nschoenwald/niks-settings-locks)** – Soft-lock and hard-lock client settings and keybindings across all connected players.
-* **[Nik's Compendium Search Tweaks](https://github.com/nschoenwald/niks-compendium-search-tweaks)** – Configure which compendium packs are included or excluded from native sidebar search.
-* **[Nik's Show & Tell](https://github.com/nschoenwald/niks-show-and-tell)** – Share popout images to chat and paste image files directly into chat messages.
-* **[Nik's Zoom / Pan Options](https://github.com/nschoenwald/niks-zoom-pan-options)** – Touchpad and scroll wheel pan/zoom controls and canvas navigation enhancements.
-
 ---
 
 ## Features
@@ -42,23 +23,6 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 - **Optional name restoration** — A world setting allows restoring original token names when combat ends (enabled by default).
 - **Customizable colors** — All 26 letter colors (background + text) can be configured per-world via the module settings.
 - **System-agnostic** — Has dedicated support for DnD5e, PF2e, and Shadowdark to accurately detect NPCs, and falls back to checking `!combatant.hasPlayerOwner` for all other systems.
-
-## Installation
-
-### Via Manifest URL
-
-1. In Foundry VTT, go to **Settings → Manage Modules → Install Module**
-2. Paste the following manifest URL:
-   ```
-   https://github.com/nschoenwald/niks-token-tags/releases/latest/download/module.json
-   ```
-3. Click **Install**
-
-### Manual Installation
-
-1. Download the latest release from the [Releases page](https://github.com/nschoenwald/niks-token-tags/releases)
-2. Extract the archive into your `Data/modules/` directory
-3. Enable the module in your world
 
 ## Settings
 
@@ -80,6 +44,23 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 The icon generation and active effect system in this module is inspired by and adapted from [Token Color Marker](https://github.com/Gundancer/foundryvtt-token-color-marker) by **Gundancer**. Thank you for the excellent reference implementation!
 
-## License
+---
 
-This module is licensed under the [MIT License](LICENSE).
+## Other Modules by Nik
+
+### 🎲 D&D 5e Specific
+* **[Nik's DnD5e Tweaks](https://github.com/nschoenwald/niks-dnd5e-tweaks)** – Consolidated collection of quality-of-life enhancements and combat automation tweaks for DnD5e.
+
+### ⚔️ Combat & Token Tools
+* **[Nik's Shared NPC Initiative](https://github.com/nschoenwald/niks-shared-npc-initiative)** – Groups NPCs of the same type in combat so they share a single initiative roll.
+* **[Nik's Movement Control](https://github.com/nschoenwald/niks-movement-control)** – GM controls to toggle player movement and automatically restrict/allow movement on combat start and end.
+* **[Nik's Tiny Change Logs](https://github.com/nschoenwald/niks-tiny-changelogs)** – Compact, single-line chat messages logging token HP and Temp HP changes.
+
+### 🎲 Visuals & Display
+* **[Nik's Dynamic Roll Area](https://github.com/nschoenwald/niks-dynamic-roll-area)** – Dynamically restricts Dice So Nice 3D dice rolling area to exclude the sidebar / chat log across all screen resolutions and window sizes.
+
+### ⚙️ Utilities & System Management
+* **[Nik's Settings Locks](https://github.com/nschoenwald/niks-settings-locks)** – Soft-lock and hard-lock client settings and keybindings across all connected players.
+* **[Nik's Compendium Search Tweaks](https://github.com/nschoenwald/niks-compendium-search-tweaks)** – Configure which compendium packs are included or excluded from native sidebar search.
+* **[Nik's Show & Tell](https://github.com/nschoenwald/niks-show-and-tell)** – Share popout images to chat and paste image files directly into chat messages.
+* **[Nik's Zoom / Pan Options](https://github.com/nschoenwald/niks-zoom-pan-options)** – Touchpad and scroll wheel pan/zoom controls and canvas navigation enhancements.
