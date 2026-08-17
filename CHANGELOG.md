@@ -1,8 +1,14 @@
 # Changelog
 
+## 14.1.3
+
+### Bug Fixes
+
+- **Compatibility (hide-npc-names):** Fixed an issue where the `hideParts` censor option in hide-npc-names would treat an NPC's single-letter suffix (e.g. `[A]`) as a match term, causing every occurrence of that letter in chat messages to be redacted. The previous patch was silently inert because it checked `window.HideNPCNames`, which is never set by hide-npc-names. The fix uses a two-layer approach: a direct monkey-patch of `HideNPCNames.updateChatMessage` via the module API at `ready` time, with a hook-based fallback that strips the suffix from `speaker.alias` before hide-npc-names' hook reads it.
+
 ## 14.1.2
 
-### Features
+### Improvements
 
 - Updated the default token suffix format from ` A` to ` [A]` (e.g. `Goblin [A]`).
 

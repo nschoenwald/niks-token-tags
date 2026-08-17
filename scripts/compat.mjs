@@ -23,37 +23,124 @@ export class Compatibility {
   static init() {
     if (!game.modules.get('hide-npc-names')?.active) return;
 
-    this._patchHideNPCNamesChatCensoring();
     this._registerCanvasHooks();
     this._registerCombatTrackerHooks();
     this._registerChatHooks();
+    this._registerSpeakerAliasPatch();
     log('Registered hide-npc-names compatibility hooks.');
   }
 
   /**
-   * Monkey-patches the `updateChatMessage` method of hide-npc-names.
-   * hide-npc-names splits the name by spaces and censors EACH word individually.
-   * If the name is "Goblin A", it will censor all "A"s in the chat message
-   * (e.g. "a pinch of sulfur").
-   * We wrap their method to strip our letter suffix from the `name` argument
-   * before their regex generation occurs.
+   * Registers a `renderChatMessageHTML` hook that runs before hide-npc-names'
+   * own hook (because we register during `setup` → `init`, which fires in
+   * registration order) and temporarily strips our `[X]` suffix from the
+   * message speaker alias. hide-npc-names reads `speaker.alias` as the `name`
+   * it censors; by removing the suffix we prevent single-letter censoring.
+   *
+   * The alias is restored immediately after so that our own later hook
+   * (_restoreLetterInChat) can still read it normally.
+   *
+   * NOTE: We also attempt a direct monkey-patch at `ready` time via
+   * `_tryPatchHideNPCNamesClass()`, which is more surgical. The hook approach
+   * acts as a guaranteed fallback.
    */
-  static _patchHideNPCNamesChatCensoring() {
-    if (window.HideNPCNames && typeof window.HideNPCNames.updateChatMessage === 'function') {
-      const originalUpdate = window.HideNPCNames.updateChatMessage;
-      window.HideNPCNames.updateChatMessage = function(html, actor, name) {
-        let sanitizedName = name;
-        if (typeof name === 'string') {
-          // If the name ends with a space and bracketed letter, strip it
-          const match = name.match(/ \[([A-Z])\]$/);
-          if (match) {
-            sanitizedName = name.slice(0, -4);
-          }
-        }
+  static _registerSpeakerAliasPatch() {
+    // Deferred class patch — attempted once the module is fully initialized.
+    Hooks.once('ready', () => {
+      this._tryPatchHideNPCNamesClass();
+    });
+  }
+
+  /**
+   * Attempt to directly monkey-patch `HideNPCNames.updateChatMessage`.
+   *
+   * hide-npc-names does NOT expose HideNPCNames on `window`, but it does
+   * expose `game.hnn.getReplacementInfo`, which is `HideNPCNames.getReplacementInfo`.
+   * From that bound reference we can recover the class and patch its static method.
+   *
+   * Falls back to a hook-based pre-sanitization approach if the class cannot be found.
+   */
+  static _tryPatchHideNPCNamesClass() {
+    // Try to reach HideNPCNames via game.hnn (their public API object)
+    const hnn = game.hnn;
+    if (!hnn) {
+      log('hide-npc-names: game.hnn not found, using hook-based fallback for censor fix.');
+      this._registerAliasStripHook();
+      return;
+    }
+
+    // game.hnn.getReplacementInfo is HideNPCNames.getReplacementInfo (static method).
+    // We can access the class via its enclosing scope by checking if the method is
+    // a static method of a class that also has updateChatMessage.
+    // The safest approach: fish it out of the module's Foundry module object.
+    const moduleApi = game.modules.get('hide-npc-names');
+    const HideNPCNamesClass = moduleApi?.api?.HideNPCNames ?? null;
+
+    if (HideNPCNamesClass && typeof HideNPCNamesClass.updateChatMessage === 'function') {
+      const originalUpdate = HideNPCNamesClass.updateChatMessage;
+      HideNPCNamesClass.updateChatMessage = function(html, actor, name) {
+        const sanitizedName = Compatibility._stripOurSuffix(name);
         return originalUpdate.call(this, html, actor, sanitizedName);
       };
-      log('Patched HideNPCNames.updateChatMessage to prevent single-letter censoring.');
+      log('Patched HideNPCNames.updateChatMessage via module API to prevent single-letter censoring.');
+    } else {
+      // Class not reachable via module API — fall back to hook approach.
+      log('hide-npc-names: HideNPCNames class not reachable via module API, using hook-based fallback.');
+      this._registerAliasStripHook();
     }
+  }
+
+  /**
+   * Hook-based fallback: registers a `renderChatMessageHTML` hook that strips
+   * our `[X]` suffix from `message.speaker.alias` before hide-npc-names' hook
+   * reads it, then restores it so our own suffix-restore hook still works.
+   *
+   * This works because Foundry fires hooks in registration order, and we
+   * registered during `setup` (before hide-npc-names' own `setup`-registered
+   * hooks in most load orders). The alias mutation is synchronous and ephemeral.
+   */
+  static _registerAliasStripHook() {
+    const patchedMessages = new WeakSet();
+
+    Hooks.on('renderChatMessageHTML', (message, _html, _data) => {
+      if (patchedMessages.has(message)) return;
+      patchedMessages.add(message);
+
+      const alias = message.speaker?.alias;
+      if (!alias || !/ \[([A-Z])\]$/.test(alias)) return;
+
+      // Temporarily strip the suffix so hide-npc-names doesn't use it as a match term.
+      const stripped = Compatibility._stripOurSuffix(alias);
+      // We cannot mutate the document directly (it's reactive), so we shadow
+      // the property on the speaker object for this render cycle only.
+      const originalSpeaker = message.speaker;
+      const patchedSpeaker = Object.assign(Object.create(null), originalSpeaker, { alias: stripped });
+      Object.defineProperty(message, 'speaker', {
+        value: patchedSpeaker, configurable: true, enumerable: true, writable: true
+      });
+
+      // Schedule restoration after all renderChatMessageHTML hooks have run
+      // by queuing a microtask (Promise.resolve) so our own restore hook sees
+      // the original alias while hide-npc-names already consumed the patched one.
+      Promise.resolve().then(() => {
+        Object.defineProperty(message, 'speaker', {
+          value: originalSpeaker, configurable: true, enumerable: true, writable: true
+        });
+      });
+    });
+
+    log('Registered alias-strip hook as hide-npc-names censor fallback.');
+  }
+
+  /**
+   * Strips our `[X]` suffix from a name string.
+   * e.g. "Goblin A" → "Goblin A" (no suffix), "Goblin [A]" → "Goblin"
+   * @param {string} name
+   * @returns {string}
+   */
+  static _stripOurSuffix(name) {
+    if (typeof name !== 'string') return name;
+    return name.replace(/ \[[A-Z]\]$/, '');
   }
 
   // ---------------------------------------------------------------------------

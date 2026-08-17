@@ -15,9 +15,9 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 ## Features
 
-- **Automatic alphabetical suffixes** — When two or more tokens of the same NPC actor are in combat, they are renamed with letter suffixes (e.g., "Goblin A", "Goblin B", "Goblin C").
+- **Automatic alphabetical suffixes** — When two or more tokens of the same NPC actor are in combat, they are renamed with letter suffixes (e.g., "Goblin [A]", "Goblin [B]", "Goblin [C]").
 - **Color-coded active effects** — Each letter gets a distinct, high-contrast colored icon applied as an active effect on the token, making it easy to tell them apart at a glance.
-- **Stable ordering** — Letters don't shift when a combatant is removed. If "Goblin B" is killed, "Goblin A" and "Goblin C" keep their letters.
+- **Stable ordering** — Letters don't shift when a combatant is removed. If "Goblin [B]" is killed, "Goblin [A]" and "Goblin [C]" keep their letters.
 - **Late additions supported** — Adding a new token of the same actor to an existing combat automatically assigns the next available letter.
 - **Suffix cleanup** — If all but one duplicate is removed from combat, the remaining token's suffix and effect are automatically removed.
 - **Optional name restoration** — A world setting allows restoring original token names when combat ends (enabled by default).
