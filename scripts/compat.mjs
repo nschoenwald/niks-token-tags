@@ -133,8 +133,8 @@ export class Compatibility {
 
       const letter = Compatibility.extractLetter(null, actor);
       if (letter && !repName.endsWith(` [${letter}]`)) {
-        // Check if token name had duplicate numbering like (1)
-        const tokenName = actor?.token?.__name ?? actor?.token?.name;
+        // Check if token name had duplicate numbering like (1) without invoking getter on .name
+        const tokenName = actor?.token?.__name || actor?.token?._source?.name || '';
         if (tokenName) {
           const numMatch = tokenName.match(/(\s\(\d+\))/);
           if (numMatch && !repName.includes(numMatch[1])) {
@@ -274,7 +274,7 @@ export class Compatibility {
    * @param {Token} token
    */
   static _fixTokenNameplate(token) {
-    if (!token.nameplate) return;
+    if (!token?.nameplate || typeof token.nameplate.text !== 'string') return;
 
     const letter = this.extractLetter(token);
     if (!letter) return;
@@ -314,7 +314,7 @@ export class Compatibility {
    */
   static _fixCombatTracker(html) {
     const combat = game.combat;
-    if (!combat) return;
+    if (!combat || !html) return;
 
     const entries = html.querySelectorAll('li[data-combatant-id]');
     for (const entry of entries) {
@@ -329,7 +329,7 @@ export class Compatibility {
       const nameEl = entry.querySelector('.token-name h4')
         || entry.querySelector('.token-name a')
         || entry.querySelector('.token-name');
-      if (!nameEl) continue;
+      if (!nameEl || typeof nameEl.textContent !== 'string') continue;
 
       if (!nameEl.textContent.includes(suffix)) {
         this._appendLetterToElement(nameEl, letter);
@@ -359,6 +359,7 @@ export class Compatibility {
    * @param {HTMLElement} html
    */
   static _restoreLetterInChat(message, html) {
+    if (!html) return;
     const letter = this.extractLetter(message);
     if (!letter) return;
 
@@ -372,6 +373,8 @@ export class Compatibility {
     const nameEl = senderEl.querySelector('.title')
       || senderEl.querySelector('.name')
       || senderEl;
+
+    if (!nameEl || typeof nameEl.textContent !== 'string') return;
 
     if (!nameEl.textContent.includes(suffix)) {
       this._appendLetterToElement(nameEl, letter);
@@ -414,42 +417,56 @@ export class Compatibility {
   // ---------------------------------------------------------------------------
 
   /**
-   * Robustly extract a single-letter tag from any entity:
+   * Helper to extract letter from a name string (e.g. "Goblin [A]" -> "A").
+   * @param {string} str
+   * @returns {string|null}
+   */
+  static _matchLetterString(str) {
+    if (typeof str !== 'string' || !str) return null;
+    const match = str.match(/\s\[([A-Z])\]$/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Robustly extract a single-letter tag from any entity WITHOUT recursion:
    * name string, ChatMessage, Combatant, Token, TokenDocument, or Actor.
    *
    * @param {any} target
    * @param {Actor} [actor=null]
+   * @param {Set} [visited=new Set()]
    * @returns {string|null} The uppercase letter (A-Z) or null
    */
-  static extractLetter(target, actor = null) {
+  static extractLetter(target, actor = null, visited = new Set()) {
     if (!target && !actor) return null;
+    if (target && visited.has(target)) return null;
+    if (actor && visited.has(actor)) return null;
+    if (target) visited.add(target);
+    if (actor) visited.add(actor);
 
     // 1. If target is string, check suffix " [X]"
     if (typeof target === 'string') {
-      const match = target.match(/\s\[([A-Z])\]$/);
-      if (match) return match[1];
+      return this._matchLetterString(target);
     }
 
     // 2. If target is a ChatMessage
     if (target?.speaker) {
       const speaker = target.speaker;
-      if (speaker.alias) {
-        const m = speaker.alias.match(/\s\[([A-Z])\]$/);
-        if (m) return m[1];
-      }
-      if (speaker.token && speaker.scene) {
-        const scene = game.scenes?.get(speaker.scene);
+      const aliasLetter = this._matchLetterString(speaker.alias);
+      if (aliasLetter) return aliasLetter;
+
+      if (speaker.token && speaker.scene && globalThis.game?.scenes) {
+        const scene = game.scenes.get(speaker.scene);
         const token = scene?.tokens?.get(speaker.token);
         if (token) {
-          const l = this.extractLetter(token);
+          const l = this._matchLetterString(token.__name) || this._matchLetterString(token._source?.name);
           if (l) return l;
         }
       }
-      if (speaker.actor) {
-        const act = game.actors?.get(speaker.actor);
+      if (speaker.actor && globalThis.game?.actors) {
+        const act = game.actors.get(speaker.actor);
         if (act) {
-          const l = this.extractLetter(null, act);
-          if (l) return l;
+          const effect = act.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
+          if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
         }
       }
     }
@@ -458,59 +475,51 @@ export class Compatibility {
     if (target?.documentName === 'Combatant' || (target?.actorId && target?.tokenId)) {
       const flag = target.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
       if (flag) return flag;
-      if (target.__name) {
-        const m = target.__name.match(/\s\[([A-Z])\]$/);
-        if (m) return m[1];
-      }
-      if (target._source?.name) {
-        const m = target._source.name.match(/\s\[([A-Z])\]$/);
-        if (m) return m[1];
-      }
+
+      const nameLetter = this._matchLetterString(target.__name) || this._matchLetterString(target._source?.name);
+      if (nameLetter) return nameLetter;
+
       if (target.token) {
-        const l = this.extractLetter(target.token);
-        if (l) return l;
+        const tLetter = this._matchLetterString(target.token.__name) || this._matchLetterString(target.token._source?.name);
+        if (tLetter) return tLetter;
       }
+
       if (target.actor) {
-        const l = this.extractLetter(null, target.actor);
-        if (l) return l;
+        const effect = target.actor.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
+        if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
       }
     }
 
     // 4. If target is a TokenDocument or Placeable Token
     const tokenDoc = target?.document ?? (target?.documentName === 'Token' ? target : null);
     if (tokenDoc) {
-      if (tokenDoc.__name) {
-        const m = tokenDoc.__name.match(/\s\[([A-Z])\]$/);
-        if (m) return m[1];
-      }
-      if (tokenDoc._source?.name) {
-        const m = tokenDoc._source.name.match(/\s\[([A-Z])\]$/);
-        if (m) return m[1];
-      }
-      const combatant = game.combat?.combatants?.find(c => c.tokenId === tokenDoc.id);
+      const nameLetter = this._matchLetterString(tokenDoc.__name) || this._matchLetterString(tokenDoc._source?.name);
+      if (nameLetter) return nameLetter;
+
+      const combatant = globalThis.game?.combat?.combatants?.find(c => c.tokenId === tokenDoc.id);
       if (combatant) {
         const flag = combatant.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
         if (flag) return flag;
       }
+
       if (tokenDoc.actor) {
-        const l = this.extractLetter(null, tokenDoc.actor);
-        if (l) return l;
+        const effect = tokenDoc.actor.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
+        if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
       }
     }
 
-    // 5. If actor (either passed as actor or target is an Actor)
-    const act = (target?.documentName === 'Actor' || target instanceof Actor) ? target : actor;
+    // 5. If actor (either target is Actor or passed as actor parameter)
+    const act = (target?.documentName === 'Actor' || (target && typeof target.hasPlayerOwner === 'boolean')) ? target : actor;
     if (act) {
+      const effect = act.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
+      if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
+
       if (act.token) {
-        const l = this.extractLetter(act.token);
-        if (l) return l;
+        const nameLetter = this._matchLetterString(act.token.__name) || this._matchLetterString(act.token._source?.name);
+        if (nameLetter) return nameLetter;
       }
-      const letterEffect = act.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
-      if (letterEffect) {
-        const flag = letterEffect.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
-        if (flag) return flag;
-      }
-      const combatant = game.combat?.combatants?.find(c => c.actorId === act.id);
+
+      const combatant = globalThis.game?.combat?.combatants?.find(c => c.actorId === act.id);
       if (combatant) {
         const flag = combatant.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
         if (flag) return flag;

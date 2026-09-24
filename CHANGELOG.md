@@ -1,5 +1,12 @@
 # Changelog
 
+## 14.1.5
+
+### Bug Fixes
+
+- **Token Placement Fix:** Eliminated circular reference recursion in letter extraction between synthetic actors and unlinked token documents (`token.actor.token`), resolving a `Maximum call stack size exceeded` error that prevented NPC tokens from being placed on the canvas.
+- **Getter Safety:** Ensured token duplicate number resolution inside `HideNPCNames.getReplacementName` accesses `__name` or `_source.name` directly, preventing re-invocation of the document name getter.
+
 ## 14.1.4
 
 ### Improvements & Bug Fixes
@@ -11,6 +18,8 @@
   - **Combat Tracker:** Fixed an early-return bug in the combat tracker walk and ensured the tag suffix is always displayed for all tagged combatants.
   - **Canvas Nameplates:** Handles both player views and GM views (including when `hide-npc-names` appends `[Hidden]`).
   - **Multi-layer Fallback:** Added system-wide hook fallbacks covering both core Foundry chat and `dnd5e.renderChatMessage`.
+
+## 14.1.3
 
 ### Bug Fixes
 

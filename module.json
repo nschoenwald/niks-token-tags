@@ -2,7 +2,7 @@
   "id": "niks-token-tags",
   "title": "Nik's Token Tags",
   "description": "Automatically renames duplicate NPC tokens in combat with alphabetical suffixes (A, B, C…) and applies color-coded letter effects for easy identification.",
-  "version": "14.1.4",
+  "version": "14.1.5",
   "compatibility": {
     "minimum": "13",
     "verified": "14"
