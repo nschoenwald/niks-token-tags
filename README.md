@@ -10,7 +10,7 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 - **Foundry VTT:** V13 – V14
 - **Game System:** System-agnostic (Dedicated support for DnD5e, PF2e, and Shadowdark)
-- **Module Integrations:** Includes a built-in compatibility patch for the `hide-npc-names` module so that letter suffixes remain visible alongside hidden names.
+- **Module Integrations:** Built-in deep compatibility with `hide-npc-names` ensuring token tag suffixes (`[A]`, `[B]`, etc.) are never censored or stripped on token nameplates, in the combat tracker, or in chat cards (sender alias, description, tooltips, and roll formulas).
 ---
 
 ## Features

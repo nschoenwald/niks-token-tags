@@ -1,6 +1,16 @@
 # Changelog
 
-## 14.1.3
+## 14.1.4
+
+### Improvements & Bug Fixes
+
+- **Compatibility (hide-npc-names):** Comprehensive compatibility overhaul to ensure token tag suffixes (e.g. `[A]`) are never censored or stripped by `hide-npc-names` anywhere:
+  - **Dynamic Class Patching:** Dynamically resolves and patches `HideNPCNames.getReplacementName`, `HideNPCNames.getReplacementInfo`, and `HideNPCNames.updateChatMessage`.
+  - **Token & Combatant Names:** `token.name` and `combatant.name` now properly return the replacement name *with* the letter suffix for players (e.g. `Unknown Creature [A]`), ensuring native canvas nameplates, hover tooltips, targeting, and third-party UI modules reflect the token tag.
+  - **Chat Message Censor Protection:** `HideNPCNames.updateChatMessage` now matches full tagged names as a whole and isolates base name parts when `hideParts` is enabled, explicitly excluding standalone letter tags (`[A]`) and single letters from match terms. This prevents redacting formulas, tooltips, descriptions, or normal text containing the letter.
+  - **Combat Tracker:** Fixed an early-return bug in the combat tracker walk and ensured the tag suffix is always displayed for all tagged combatants.
+  - **Canvas Nameplates:** Handles both player views and GM views (including when `hide-npc-names` appends `[Hidden]`).
+  - **Multi-layer Fallback:** Added system-wide hook fallbacks covering both core Foundry chat and `dnd5e.renderChatMessage`.
 
 ### Bug Fixes
 

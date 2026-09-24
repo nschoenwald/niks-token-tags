@@ -9,6 +9,7 @@ log('Module loaded.');
 
 Hooks.once('init', () => {
   Settings.registerSettings(ColorConfig);
+  Compatibility.init();
 });
 
 Hooks.once('setup', () => {
@@ -16,6 +17,8 @@ Hooks.once('setup', () => {
 });
 
 Hooks.once('ready', async () => {
+  Compatibility.sync();
+
   // Only the GM should generate icon files
   if (game.user.isGM) {
     try {
