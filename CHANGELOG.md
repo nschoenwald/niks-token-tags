@@ -1,5 +1,12 @@
 # Changelog
 
+## 14.1.6
+
+### Improvements
+
+- **Solitary Enemy Tags:** When there is only one enemy NPC token in the combat, token tags and letter effects are no longer assigned.
+- **Dynamic Suffix Cleanup:** If combatants are defeated or removed from combat such that only one enemy NPC token remains, its tag suffix and active effect are automatically removed and its original name is restored.
+
 ## 14.1.5
 
 ### Bug Fixes

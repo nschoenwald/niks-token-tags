@@ -56,9 +56,10 @@ export class CombatMarker {
   }
 
   /**
-   * When a combatant is removed, handle the remaining group.
-   * If only one remains, remove its suffix and effect.
-   * If more than one remain, leave their existing suffixes intact (stable ordering).
+   * When a combatant is removed, handle the remaining enemy group(s).
+   * If only one enemy NPC token remains in the combat, remove its suffix and effect.
+   * If more than one remain, leave their existing suffixes intact (stable ordering),
+   * unless includeSingletons is false and only one remains for that specific actor.
    * @param {Combatant} combatant
    * @param {object} options
    * @param {string} userId
@@ -71,12 +72,24 @@ export class CombatMarker {
     const combat = combatant.combat;
     if (!combat) return;
 
+    // Remaining enemy NPCs in combat (excluding the deleted combatant)
+    const remainingEnemyNPCs = combat.combatants.filter(
+      c => c.id !== combatant.id && this._isEnemyNPC(c)
+    );
+
+    // If only one (or zero) enemy NPC token remains in the combat, don't assign tags
+    if (remainingEnemyNPCs.length <= 1) {
+      for (const remaining of remainingEnemyNPCs) {
+        await this._removeSuffix(remaining);
+      }
+      return;
+    }
+
     const actorId = combatant.actorId;
     if (!actorId) return;
 
     // Get remaining combatants with the same actor (excluding the deleted one)
-    const remainingForActor = this._getActorGroup(combat, actorId)
-      .filter(c => c.id !== combatant.id);
+    const remainingForActor = remainingEnemyNPCs.filter(c => c.actorId === actorId);
 
     const includeSingletons = game.settings.get(MODULE, Settings.INCLUDE_SINGLETONS);
 
@@ -154,10 +167,22 @@ export class CombatMarker {
       const isGlobal = game.settings.get(MODULE, Settings.UNIQUE_LETTERS);
       const includeSingletons = game.settings.get(MODULE, Settings.INCLUDE_SINGLETONS);
 
-      // Group all NPC combatants by actorId
+      const enemyNPCs = this._getEnemyNPCs(combat);
+
+      // When there is only one (or zero) enemy NPC token in the combat, don't assign tags
+      if (enemyNPCs.length <= 1) {
+        log(`Only ${enemyNPCs.length} enemy NPC token(s) in combat — skipping tag assignment and clearing existing tags.`);
+        for (const combatant of combat.combatants) {
+          if (combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME) || combatant.getFlag(MODULE, FLAGS.COMBAT_LETTER)) {
+            await this._removeSuffix(combatant);
+          }
+        }
+        return;
+      }
+
+      // Group all enemy NPC combatants by actorId
       const actorGroups = new Map();
-      for (const combatant of combat.combatants) {
-        if (!this._isNPC(combatant)) continue;
+      for (const combatant of enemyNPCs) {
         const actorId = combatant.actorId;
         if (!actorId) continue;
         if (!actorGroups.has(actorId)) actorGroups.set(actorId, []);
@@ -314,8 +339,18 @@ export class CombatMarker {
    * @param {Combatant} combatant
    */
   static async _removeSuffix(combatant) {
-    const originalName = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
-    if (!originalName) return;
+    let originalName = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
+    if (!originalName) {
+      const match = combatant.name?.match(/^(.*) \[([A-Z])\]$/) ?? combatant.token?.name?.match(/^(.*) \[([A-Z])\]$/);
+      if (match) {
+        originalName = match[1];
+      }
+    }
+
+    if (!originalName) {
+      await this._removeLetterEffect(combatant);
+      return;
+    }
 
     const tokenDoc = combatant.token;
 
@@ -434,12 +469,36 @@ export class CombatMarker {
   }
 
   /**
-   * Get all NPC combatants in a combat that share the given actorId.
+   * Check if a combatant is an enemy NPC token.
+   * Considers NPC status, ownership, and disposition.
+   * @param {Combatant} combatant
+   * @returns {boolean}
+   */
+  static _isEnemyNPC(combatant) {
+    if (!this._isNPC(combatant)) return false;
+    if (combatant.hasPlayerOwner) return false;
+    const disposition = combatant.token?.disposition ?? combatant.actor?.prototypeToken?.disposition;
+    const friendly = globalThis.CONST?.TOKEN_DISPOSITIONS?.FRIENDLY ?? 1;
+    if (disposition === friendly) return false;
+    return true;
+  }
+
+  /**
+   * Get all enemy NPC combatants in a combat.
+   * @param {Combat} combat
+   * @returns {Combatant[]}
+   */
+  static _getEnemyNPCs(combat) {
+    return combat.combatants.filter(c => this._isEnemyNPC(c));
+  }
+
+  /**
+   * Get all enemy NPC combatants in a combat that share the given actorId.
    * @param {Combat} combat
    * @param {string} actorId
    * @returns {Combatant[]}
    */
   static _getActorGroup(combat, actorId) {
-    return combat.combatants.filter(c => c.actorId === actorId && this._isNPC(c));
+    return combat.combatants.filter(c => c.actorId === actorId && this._isEnemyNPC(c));
   }
 }

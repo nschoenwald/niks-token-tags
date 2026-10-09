@@ -15,11 +15,12 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 ## Features
 
-- **Automatic alphabetical suffixes** — When two or more tokens of the same NPC actor are in combat, they are renamed with letter suffixes (e.g., "Goblin [A]", "Goblin [B]", "Goblin [C]").
+- **Automatic alphabetical suffixes** — When two or more enemy NPC tokens are in combat, they are renamed with letter suffixes (e.g., "Goblin [A]", "Goblin [B]", "Goblin [C]").
+- **No tags for solitary enemies** — When there is only one enemy NPC token in the combat, tags and letter effects are not assigned.
 - **Color-coded active effects** — Each letter gets a distinct, high-contrast colored icon applied as an active effect on the token, making it easy to tell them apart at a glance.
 - **Stable ordering** — Letters don't shift when a combatant is removed. If "Goblin [B]" is killed, "Goblin [A]" and "Goblin [C]" keep their letters.
 - **Late additions supported** — Adding a new token of the same actor to an existing combat automatically assigns the next available letter.
-- **Suffix cleanup** — If all but one duplicate is removed from combat, the remaining token's suffix and effect are automatically removed.
+- **Suffix cleanup** — If combatants are removed such that only one enemy NPC token remains in combat (or only one duplicate of a type when singletons are excluded), the remaining token's suffix and effect are automatically removed.
 - **Optional name restoration** — A world setting allows restoring original token names when combat ends (enabled by default).
 - **Customizable colors** — All 26 letter colors (background + text) can be configured per-world via the module settings.
 - **System-agnostic** — Has dedicated support for DnD5e, PF2e, and Shadowdark to accurately detect NPCs, and falls back to checking `!combatant.hasPlayerOwner` for all other systems.
@@ -29,16 +30,19 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 | Setting | Default | Description |
 |---------|---------|-------------|
 | **Enable Token Tags** | ✅ On | Master toggle for the module |
+| **Unique Letters Globally** | ✅ On | Assigns unique letters across all types of NPCs in the combat (e.g. Goblin [A], Hobgoblin [B]) rather than per actor type |
+| **Letter Unique Creatures** | ✅ On | When multiple enemies are in combat, unique creature types (singletons) also receive letters (e.g. Boss [A], Goblin [B]) |
 | **Restore Names on Combat End** | ✅ On | Restore original token names and remove letter effects when combat is deleted |
 | **Icon Storage Directory** | `assets/niks-token-tags` | Directory in user data where generated letter icons are stored |
 | **Configure Colors** | — | Opens a configuration menu to customize the background and text color for each letter A–Z |
 
 ## How It Works
 
-1. When a combatant is added to combat, the module checks if there are now ≥2 NPC combatants sharing the same base actor.
-2. If so, each token in the group is renamed with an alphabetical suffix (A, B, C…Z, then wrapping back to A for 26+ duplicates).
+1. When a combatant is added to combat, the module checks the number of enemy NPC tokens in combat. If there is only one enemy NPC token, no tags are assigned.
+2. When two or more enemy NPC tokens are present, each eligible token is renamed with an alphabetical suffix (A, B, C…Z, wrapping back to A for 26+ tokens).
 3. A matching active effect with a colored letter icon is applied to each token for visual identification.
 4. Both the token name (on the canvas) and the combatant name (in the combat tracker) are updated.
+5. If combatants are removed until only a single enemy NPC remains, its tag and active effect are automatically removed.
 
 ## Credits
 
