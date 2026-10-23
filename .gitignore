@@ -24,4 +24,10 @@ _references/hide-npc-names-main/scripts/utils.js
 _references/hide-npc-names-main/styles/hide-npc-names.css
 _references/hide-npc-names-main/templates/actor-hide-name.hbs
 module.zip
-CHANGELOG_internal.md
+
+# Markdown: ignore all, except the docs shipped with the module
+*.md
+!README.md
+!CHANGELOG.md
+# Keep the reference module's docs out of the repo
+_references/**/*.md
