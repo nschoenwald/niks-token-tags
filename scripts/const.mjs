@@ -7,15 +7,22 @@ export const FLAGS = {
   COMBAT_LETTER: 'combatLetter',
 };
 
+/** Cached value of the debug setting, kept current by the setting's onChange. */
+let debugEnabled = false;
+
+/**
+ * Update the cached debug flag.
+ * @param {boolean} enabled
+ */
+export function setDebug(enabled) {
+  debugEnabled = !!enabled;
+}
+
 /**
  * Log a message to the console, prefixed with the module name.
  * @param  {...any} args
  */
 export function log(...args) {
-  try {
-    if (!game?.settings?.get(MODULE, 'debug')) return;
-  } catch (e) {
-    return; // Don't log if settings aren't initialized yet
-  }
+  if (!debugEnabled) return;
   console.log(`${MODULE} |`, ...args);
 }

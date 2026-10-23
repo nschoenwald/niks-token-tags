@@ -37,6 +37,19 @@ export class Compatibility {
   static _HideNPCNamesRef = null;
 
   /**
+   * Lazily built lookup of combatant letter flags for the viewed combat:
+   * `{ combat, byToken: Map<tokenId, letter>, byActor: Map<actorId, letter> }`.
+   * Rebuilt when invalidated by a combatant change or when `game.combat` changes.
+   */
+  static _letterIndex = null;
+
+  /** Cache of actor → letter from its token tag effect (null if none). */
+  static _effectLetterCache = new WeakMap();
+
+  /** Cache of compiled chat censor patterns keyed by hideParts flag and name. */
+  static _chatPatternCache = new Map();
+
+  /**
    * Initialize all compatibility patches.
    * Can be called during `init` and `setup` (idempotent).
    */
@@ -50,6 +63,7 @@ export class Compatibility {
     this._initialized = true;
 
     // Register UI fallback hooks immediately
+    this._registerCacheHooks();
     this._registerCanvasHooks();
     this._registerCombatTrackerHooks();
     this._registerChatHooks();
@@ -182,70 +196,29 @@ export class Compatibility {
         hideParts = true;
       }
 
-      // Collect all terms to search and replace
-      const termsSet = new Set();
-
-      // Full name with suffix (e.g. "Goblin [A]")
-      if (name && name.trim().length > 0) {
-        termsSet.add(name.trim());
-      }
-
-      // Base name without suffix (e.g. "Goblin")
-      if (baseName && baseName.length > 0) {
-        termsSet.add(baseName);
-      }
-
-      // If hideParts is true, split baseName into parts (NEVER including the suffix in the split)
-      if (hideParts && baseName.includes(' ')) {
-        const parts = baseName.split(/\s+/).filter(w => w.length > 0);
-        const rejectTerms = new Set(['of', 'its', 'the', 'a', "it's", 'if', 'in', 'for', 'on', 'by', 'and']);
-        for (let i = 0; i < parts.length; i++) {
-          const len = parts.length - i;
-          for (let p = 0; p <= i; p++) {
-            const part = parts.slice(p, p + len);
-            if (part.length === 1 && rejectTerms.has(part[0].toLowerCase())) {
-              continue;
-            }
-            termsSet.add(part.join(' '));
-          }
-        }
-      }
-
-      // Filter terms:
-      // CRITICAL: NEVER allow standalone letter tags like "[A]", "A", or "[X]" to be censored!
-      const validTerms = Array.from(termsSet).filter(term => {
-        const trimmed = term.trim();
-        if (trimmed.length === 0) return false;
-        // Exclude single letters or isolated bracketed tags: e.g. "A", "[A]"
-        if (/^\[?[A-Za-z0-9]\]?$/.test(trimmed)) return false;
-        return true;
-      });
-
-      if (validTerms.length === 0) {
+      const pattern = Compatibility._getChatPattern(name, baseName, hideParts);
+      if (!pattern) {
         Hooks.callAll('hideNPCNamesChatMessageUpdated', message, html);
         return;
       }
 
-      // Sort terms by length descending so longer phrases match first
-      validTerms.sort((a, b) => b.length - a.length);
+      // Do replacement on text nodes (skipping script/noscript/style contents)
+      const walker = document.createTreeWalker(html, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        const text = node.textContent;
+        if (!text || /^(SCRIPT|NOSCRIPT|STYLE)$/.test(node.parentElement?.tagName)) continue;
+        const replaced = text.replace(pattern, nameToUse);
+        if (replaced !== text) node.textContent = replaced;
+      }
 
-      const escapeRegExp = (s) => s.replace(/[.*+\-?^${}()|[\]\\]/g, '\\$&');
-      const matchString = validTerms.map(t => escapeRegExp(t.trim())).join('|');
-
-      const regex = `(${matchString})(?=\\s|[\\W]|s\\W|'s\\W|$)`;
-      const pattern = new RegExp(regex, 'gim');
-
-      // Do replacement on text nodes
-      const elements = [html, ...html.querySelectorAll('*:not(script):not(noscript):not(style)')];
-      for (const el of elements) {
-        for (const node of Array.from(el.childNodes)) {
-          if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-            node.textContent = node.textContent.replace(pattern, nameToUse);
-          }
-        }
-        if (el.dataset?.tooltip) {
-          el.dataset.tooltip = el.dataset.tooltip.replace(pattern, nameToUse);
-        }
+      // And on tooltips
+      const tooltipEls = html.dataset?.tooltip ? [html, ...html.querySelectorAll('[data-tooltip]')] : html.querySelectorAll('[data-tooltip]');
+      for (const el of tooltipEls) {
+        const tooltip = el.dataset.tooltip;
+        if (!tooltip) continue;
+        const replaced = tooltip.replace(pattern, nameToUse);
+        if (replaced !== tooltip) el.dataset.tooltip = replaced;
       }
 
       Hooks.callAll('hideNPCNamesChatMessageUpdated', message, html);
@@ -257,6 +230,133 @@ export class Compatibility {
 
     this._hideNPCNamesPatched = true;
     log('Patched HideNPCNames class methods (getReplacementName, getReplacementInfo, updateChatMessage).');
+  }
+
+  /**
+   * Build (or fetch from cache) the censor RegExp for a speaker name.
+   * Returns null if there are no valid terms to censor.
+   * @param {string} name - Full speaker name (may include the `[X]` suffix)
+   * @param {string} baseName - Name without the suffix
+   * @param {boolean} hideParts - Whether to also censor parts of the name
+   * @returns {RegExp|null}
+   */
+  static _getChatPattern(name, baseName, hideParts) {
+    const cacheKey = `${hideParts ? 1 : 0}|${name ?? ''}`;
+    if (this._chatPatternCache.has(cacheKey)) return this._chatPatternCache.get(cacheKey);
+
+    // Collect all terms to search and replace
+    const termsSet = new Set();
+
+    // Full name with suffix (e.g. "Goblin [A]")
+    if (name && name.trim().length > 0) {
+      termsSet.add(name.trim());
+    }
+
+    // Base name without suffix (e.g. "Goblin")
+    if (baseName && baseName.length > 0) {
+      termsSet.add(baseName);
+    }
+
+    // If hideParts is true, split baseName into parts (NEVER including the suffix in the split)
+    if (hideParts && baseName.includes(' ')) {
+      const parts = baseName.split(/\s+/).filter(w => w.length > 0);
+      const rejectTerms = new Set(['of', 'its', 'the', 'a', "it's", 'if', 'in', 'for', 'on', 'by', 'and']);
+      for (let i = 0; i < parts.length; i++) {
+        const len = parts.length - i;
+        for (let p = 0; p <= i; p++) {
+          const part = parts.slice(p, p + len);
+          if (part.length === 1 && rejectTerms.has(part[0].toLowerCase())) {
+            continue;
+          }
+          termsSet.add(part.join(' '));
+        }
+      }
+    }
+
+    // Filter terms:
+    // CRITICAL: NEVER allow standalone letter tags like "[A]", "A", or "[X]" to be censored!
+    const validTerms = Array.from(termsSet).filter(term => {
+      const trimmed = term.trim();
+      if (trimmed.length === 0) return false;
+      // Exclude single letters or isolated bracketed tags: e.g. "A", "[A]"
+      if (/^\[?[A-Za-z0-9]\]?$/.test(trimmed)) return false;
+      return true;
+    });
+
+    let pattern = null;
+    if (validTerms.length > 0) {
+      // Sort terms by length descending so longer phrases match first
+      validTerms.sort((a, b) => b.length - a.length);
+
+      const matchString = validTerms.map(t => this._escapeRegExp(t.trim())).join('|');
+      pattern = new RegExp(`(${matchString})(?=\\s|[\\W]|s\\W|'s\\W|$)`, 'gim');
+    }
+
+    // Keep the cache bounded; speaker names are few, so a simple reset is enough
+    if (this._chatPatternCache.size >= 200) this._chatPatternCache.clear();
+    this._chatPatternCache.set(cacheKey, pattern);
+    return pattern;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lookup Caches
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Invalidate the letter lookups whenever the data they are derived from changes.
+   * These hooks fire on every client, so players' caches stay current too.
+   */
+  static _registerCacheHooks() {
+    const invalidateIndex = () => { this._letterIndex = null; };
+    for (const hook of ['createCombatant', 'updateCombatant', 'deleteCombatant', 'deleteCombat']) {
+      Hooks.on(hook, invalidateIndex);
+    }
+
+    const invalidateEffects = () => { this._effectLetterCache = new WeakMap(); };
+    for (const hook of ['createActiveEffect', 'updateActiveEffect', 'deleteActiveEffect', 'updateActor']) {
+      Hooks.on(hook, invalidateEffects);
+    }
+    // Synthetic (unlinked) actor effects live in the token's delta
+    Hooks.on('updateToken', (tokenDoc, changes) => {
+      if ('delta' in changes || 'actorLink' in changes || 'actorId' in changes) invalidateEffects();
+    });
+  }
+
+  /**
+   * Get (building if needed) the combatant letter index for the viewed combat.
+   * @returns {{ combat: Combat|null, byToken: Map<string, string>, byActor: Map<string, string> }}
+   */
+  static _getLetterIndex() {
+    const combat = globalThis.game?.combat ?? null;
+    if (this._letterIndex?.combat === combat) return this._letterIndex;
+
+    const byToken = new Map();
+    const byActor = new Map();
+    for (const combatant of combat?.combatants ?? []) {
+      const letter = combatant.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
+      if (!letter) continue;
+      if (combatant.tokenId) byToken.set(combatant.tokenId, letter);
+      if (combatant.actorId && !byActor.has(combatant.actorId)) byActor.set(combatant.actorId, letter);
+    }
+
+    this._letterIndex = { combat, byToken, byActor };
+    return this._letterIndex;
+  }
+
+  /**
+   * Get the letter of an actor's token tag effect, cached per actor instance.
+   * @param {Actor} actor
+   * @returns {string|null}
+   */
+  static _getEffectLetter(actor) {
+    if (!actor || typeof actor !== 'object') return null;
+    let letter = this._effectLetterCache.get(actor);
+    if (letter === undefined) {
+      const effect = actor.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
+      letter = effect?.getFlag(MODULE, FLAGS.COMBAT_LETTER) ?? null;
+      this._effectLetterCache.set(actor, letter);
+    }
+    return letter;
   }
 
   // ---------------------------------------------------------------------------
@@ -431,17 +531,16 @@ export class Compatibility {
    * Robustly extract a single-letter tag from any entity WITHOUT recursion:
    * name string, ChatMessage, Combatant, Token, TokenDocument, or Actor.
    *
+   * Called from very hot paths (every `refreshToken`, every combat tracker render, and every
+   * hide-npc-names name lookup), so combatant and effect lookups go through cached indexes
+   * instead of scanning collections.
+   *
    * @param {any} target
    * @param {Actor} [actor=null]
-   * @param {Set} [visited=new Set()]
    * @returns {string|null} The uppercase letter (A-Z) or null
    */
-  static extractLetter(target, actor = null, visited = new Set()) {
+  static extractLetter(target, actor = null) {
     if (!target && !actor) return null;
-    if (target && visited.has(target)) return null;
-    if (actor && visited.has(actor)) return null;
-    if (target) visited.add(target);
-    if (actor) visited.add(actor);
 
     // 1. If target is string, check suffix " [X]"
     if (typeof target === 'string') {
@@ -463,11 +562,8 @@ export class Compatibility {
         }
       }
       if (speaker.actor && globalThis.game?.actors) {
-        const act = game.actors.get(speaker.actor);
-        if (act) {
-          const effect = act.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
-          if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
-        }
+        const l = this._getEffectLetter(game.actors.get(speaker.actor));
+        if (l) return l;
       }
     }
 
@@ -484,10 +580,8 @@ export class Compatibility {
         if (tLetter) return tLetter;
       }
 
-      if (target.actor) {
-        const effect = target.actor.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
-        if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
-      }
+      const effectLetter = this._getEffectLetter(target.actor);
+      if (effectLetter) return effectLetter;
     }
 
     // 4. If target is a TokenDocument or Placeable Token
@@ -496,34 +590,27 @@ export class Compatibility {
       const nameLetter = this._matchLetterString(tokenDoc.__name) || this._matchLetterString(tokenDoc._source?.name);
       if (nameLetter) return nameLetter;
 
-      const combatant = globalThis.game?.combat?.combatants?.find(c => c.tokenId === tokenDoc.id);
-      if (combatant) {
-        const flag = combatant.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
-        if (flag) return flag;
-      }
+      const flag = this._getLetterIndex().byToken.get(tokenDoc.id);
+      if (flag) return flag;
 
-      if (tokenDoc.actor) {
-        const effect = tokenDoc.actor.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
-        if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
-      }
+      const effectLetter = this._getEffectLetter(tokenDoc.actor);
+      if (effectLetter) return effectLetter;
     }
 
     // 5. If actor (either target is Actor or passed as actor parameter)
     const act = (target?.documentName === 'Actor' || (target && typeof target.hasPlayerOwner === 'boolean')) ? target : actor;
     if (act) {
-      const effect = act.effects?.find(e => e.getFlag?.(MODULE, FLAGS.COMBAT_LETTER));
-      if (effect) return effect.getFlag(MODULE, FLAGS.COMBAT_LETTER);
+      const effectLetter = this._getEffectLetter(act);
+      if (effectLetter) return effectLetter;
 
       if (act.token) {
         const nameLetter = this._matchLetterString(act.token.__name) || this._matchLetterString(act.token._source?.name);
         if (nameLetter) return nameLetter;
       }
 
-      const combatant = globalThis.game?.combat?.combatants?.find(c => c.actorId === act.id);
-      if (combatant) {
-        const flag = combatant.getFlag?.(MODULE, FLAGS.COMBAT_LETTER);
-        if (flag) return flag;
-      }
+      const index = this._getLetterIndex();
+      const flag = (act.token && index.byToken.get(act.token.id)) || index.byActor.get(act.id);
+      if (flag) return flag;
     }
 
     return null;

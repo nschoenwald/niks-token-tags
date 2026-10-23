@@ -1,5 +1,21 @@
 # Changelog
 
+## 14.2.0
+
+### Performance
+
+- **Batched Combat Writes:** Suffix assignment and removal now collect all changes and commit them as one Token update per scene and one Combatant update per combat, with per-actor letter effects written in parallel. Previously every NPC caused three sequential database round trips, each re-rendering the combat tracker and refreshing tokens on every client — the main cause of the slowdown when starting combats with many NPCs. Restoring names when combat ends is batched the same way.
+- **In-place Effect Updates:** An existing letter effect is now updated instead of deleted and re-created.
+- **Cached Letter Lookups (hide-npc-names compatibility):** Letter lookups used on every token refresh, combat tracker render, and hide-npc-names name lookup now use cached indexes instead of scanning all combatants and actor effects each time.
+- **Faster Chat Censoring:** The patched `updateChatMessage` caches its compiled pattern per speaker name and walks only text nodes and tooltip elements, writing to the DOM only when something changes.
+- **Faster World Load:** Icon generation browses the icon directory once instead of once per letter, only creates the directory when it is missing, and generates missing icons in parallel.
+- **Debug Logging:** The debug setting is cached instead of being read on every log call.
+
+### Bug Fixes
+
+- **Multiple GMs:** Only the active GM processes combats, preventing duplicate and conflicting writes when several GMs are connected.
+- **Missed Combatants:** Combatants added while a combat was already being processed were skipped; another pass is now queued instead.
+
 ## 14.1.6
 
 ### Improvements

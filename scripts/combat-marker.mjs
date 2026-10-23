@@ -2,9 +2,17 @@ import { MODULE, LETTERS, FLAGS, log } from './const.mjs';
 import { Settings } from './settings.mjs';
 import { IconGenerator } from './icon-generator.mjs';
 
+const SUFFIX_PATTERN = /^(.*) \[([A-Z])\]$/;
+
 /**
  * Core logic for automatically renaming NPC tokens in combat with
  * alphabetical suffixes and applying color-coded active effects.
+ *
+ * All document writes for a processing pass are collected into a "plan" and committed
+ * in as few database operations as possible (one Token update per scene, one Combatant
+ * update per combat, and parallel per-actor effect writes). This avoids a long chain of
+ * sequential round trips, each of which re-renders the combat tracker and refreshes tokens
+ * on every connected client.
  */
 export class CombatMarker {
 
@@ -13,6 +21,9 @@ export class CombatMarker {
 
   /** Processing lock — prevents re-entrant processing for the same combat. */
   static _processingLock = new Set();
+
+  /** Combats that were requested again while being processed, and need another pass. */
+  static _rerunRequested = new Set();
 
   /**
    * Register all combat-related hooks.
@@ -36,7 +47,7 @@ export class CombatMarker {
    * @param {string} userId
    */
   static _onCreateCombatant(combatant, options, userId) {
-    if (!game.user.isGM) return;
+    if (!this._isResponsibleGM()) return;
     if (!game.settings.get(MODULE, Settings.ENABLED)) return;
     if (!this._isNPC(combatant)) return;
 
@@ -65,7 +76,7 @@ export class CombatMarker {
    * @param {string} userId
    */
   static async _onDeleteCombatant(combatant, options, userId) {
-    if (!game.user.isGM) return;
+    if (!this._isResponsibleGM()) return;
     if (!game.settings.get(MODULE, Settings.ENABLED)) return;
     if (!this._isNPC(combatant)) return;
 
@@ -77,11 +88,14 @@ export class CombatMarker {
       c => c.id !== combatant.id && this._isEnemyNPC(c)
     );
 
+    const plan = this._createPlan();
+
     // If only one (or zero) enemy NPC token remains in the combat, don't assign tags
     if (remainingEnemyNPCs.length <= 1) {
       for (const remaining of remainingEnemyNPCs) {
-        await this._removeSuffix(remaining);
+        this._planRemoveSuffix(plan, remaining);
       }
+      await this._commitPlan(combat, plan);
       return;
     }
 
@@ -95,7 +109,8 @@ export class CombatMarker {
 
     if (remainingForActor.length === 1 && !includeSingletons) {
       // Only one left of this type, and we don't letter singletons
-      await this._removeSuffix(remainingForActor[0]);
+      this._planRemoveSuffix(plan, remainingForActor[0]);
+      await this._commitPlan(combat, plan);
     }
     // If 2+ remain, keep their existing suffixes for stability (no re-lettering mid-combat)
   }
@@ -109,41 +124,24 @@ export class CombatMarker {
    * @param {string} userId
    */
   static async _onDeleteCombat(combat, options, userId) {
-    if (!game.user.isGM) return;
+    if (!this._isResponsibleGM()) return;
     if (!game.settings.get(MODULE, Settings.ENABLED)) return;
     if (!game.settings.get(MODULE, Settings.RESTORE_ON_COMBAT_END)) return;
 
+    const plan = this._createPlan();
     for (const combatant of combat.combatants) {
       if (!this._isNPC(combatant)) continue;
       const originalName = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
       if (!originalName) continue;
 
       // Restore original token name directly (combat/combatant is already deleted)
-      const tokenDoc = combatant.token;
-      if (tokenDoc) {
-        try {
-          await tokenDoc.update({ name: originalName });
-          log(`Restored token name "${originalName}"`);
-        } catch (e) {
-          console.warn(`${MODULE} | Could not restore token name:`, e);
-        }
-      }
+      this._planTokenUpdate(plan, combatant.token, { name: originalName });
 
       // Remove letter effects from actor directly
-      const actor = combatant.actor;
-      if (actor) {
-        try {
-          const effectIds = actor.effects
-            .filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER))
-            .map(e => e.id);
-          if (effectIds.length > 0) {
-            await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds, { animate: false });
-          }
-        } catch (e) {
-          console.warn(`${MODULE} | Could not remove letter effects:`, e);
-        }
-      }
+      this._planEffect(plan, combatant.actor, null);
     }
+
+    await this._commitPlan(null, plan);
     log('Combat ended — restored original token names.');
   }
 
@@ -153,12 +151,14 @@ export class CombatMarker {
 
   /**
    * Process all NPC actor groups in a combat, assigning suffixes where needed.
-   * Uses a processing lock to prevent re-entrant execution.
+   * Uses a processing lock to prevent re-entrant execution. A request that arrives while
+   * the combat is being processed schedules one more pass once the current one finishes.
    * @param {Combat} combat
    */
   static async _processAllGroups(combat) {
     if (this._processingLock.has(combat.id)) {
-      log(`Skipping — already processing combat ${combat.id}`);
+      log(`Already processing combat ${combat.id} — queuing another pass.`);
+      this._rerunRequested.add(combat.id);
       return;
     }
     this._processingLock.add(combat.id);
@@ -168,15 +168,17 @@ export class CombatMarker {
       const includeSingletons = game.settings.get(MODULE, Settings.INCLUDE_SINGLETONS);
 
       const enemyNPCs = this._getEnemyNPCs(combat);
+      const plan = this._createPlan();
 
       // When there is only one (or zero) enemy NPC token in the combat, don't assign tags
       if (enemyNPCs.length <= 1) {
         log(`Only ${enemyNPCs.length} enemy NPC token(s) in combat — skipping tag assignment and clearing existing tags.`);
         for (const combatant of combat.combatants) {
           if (combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME) || combatant.getFlag(MODULE, FLAGS.COMBAT_LETTER)) {
-            await this._removeSuffix(combatant);
+            this._planRemoveSuffix(plan, combatant);
           }
         }
+        await this._commitPlan(combat, plan);
         return;
       }
 
@@ -190,34 +192,34 @@ export class CombatMarker {
       }
 
       const groupsToProcess = [];
-      const singletonsToRemove = [];
 
       for (const group of actorGroups.values()) {
         if (group.length === 1 && !includeSingletons) {
-          singletonsToRemove.push(group[0]);
+          this._planRemoveSuffix(plan, group[0]);
         } else if (group.length > 0) {
           groupsToProcess.push(group);
         }
       }
 
-      for (const combatant of singletonsToRemove) {
-        await this._removeSuffix(combatant);
-      }
-
       if (isGlobal) {
         const allNpcsToProcess = groupsToProcess.flat();
         if (allNpcsToProcess.length > 0) {
-          await this._applySuffixesToGroup(allNpcsToProcess);
+          this._planGroupSuffixes(plan, allNpcsToProcess);
         }
       } else {
         for (const group of groupsToProcess) {
-          await this._applySuffixesToGroup(group);
+          this._planGroupSuffixes(plan, group);
         }
       }
+
+      await this._commitPlan(combat, plan);
     } catch (error) {
       console.error(`${MODULE} | Error processing combat groups:`, error);
     } finally {
       this._processingLock.delete(combat.id);
+      if (this._rerunRequested.delete(combat.id) && game.combats.has(combat.id)) {
+        this._processAllGroups(combat);
+      }
     }
   }
 
@@ -225,7 +227,12 @@ export class CombatMarker {
   // Suffix Management
   // ---------------------------------------------------------------------------
 
-  static async _applySuffixesToGroup(group) {
+  /**
+   * Plan suffix assignment for a group of combatants sharing a letter sequence.
+   * @param {object} plan
+   * @param {Combatant[]} group
+   */
+  static _planGroupSuffixes(plan, group) {
     const usedLetters = new Set();
     const unassigned = [];
 
@@ -234,7 +241,7 @@ export class CombatMarker {
       const tokenDoc = combatant.token;
       if (!tokenDoc) continue;
 
-      const nameMatch = tokenDoc.name.match(/^(.*) \[([A-Z])\]$/);
+      const nameMatch = tokenDoc.name.match(SUFFIX_PATTERN);
 
       if (nameMatch) {
         // Token has a letter suffix in its name
@@ -247,7 +254,8 @@ export class CombatMarker {
 
         // Update flags if they don't match the current name suffix
         if (flagLetter !== letter || originalName !== baseName) {
-          await combatant.update({
+          plan.combatantUpdates.push({
+            _id: combatant.id,
             [`flags.${MODULE}.${FLAGS.ORIGINAL_NAME}`]: baseName,
             [`flags.${MODULE}.${FLAGS.COMBAT_LETTER}`]: letter,
           });
@@ -256,12 +264,12 @@ export class CombatMarker {
         // Check if the actor has the correct active effect and no mismatched ones
         const actor = combatant.actor;
         if (actor) {
-          const effects = actor.effects.filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER));
+          const effects = this._getLetterEffects(actor);
           const hasCorrectEffect = effects.some(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER) === letter);
           const hasMismatchingEffect = effects.some(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER) !== letter);
 
           if (!hasCorrectEffect || hasMismatchingEffect) {
-            await this._applyLetterEffect(combatant, letter);
+            this._planEffect(plan, actor, letter);
           }
         }
       } else {
@@ -274,7 +282,9 @@ export class CombatMarker {
       }
     }
 
-    // Sort unassigned combatants by Actor Name (to group same types together), 
+    if (unassigned.length === 0) return;
+
+    // Sort unassigned combatants by Actor Name (to group same types together),
     // then by ID (proxy for creation order) for stable assignment
     unassigned.sort((a, b) => {
       const nameA = a.actor?.name || '';
@@ -284,8 +294,6 @@ export class CombatMarker {
       }
       return a.id.localeCompare(b.id);
     });
-
-    if (unassigned.length === 0) return;
 
     // Assign letters sequentially, skipping already-used ones, wrapping at Z
     let letterIndex = 0;
@@ -300,16 +308,17 @@ export class CombatMarker {
       usedLetters.add(letter);
       letterIndex++;
 
-      await this._assignSuffix(combatant, letter);
+      this._planAssignSuffix(plan, combatant, letter);
     }
   }
 
   /**
-   * Assign a letter suffix to a combatant: rename the token and combatant, and apply the effect.
+   * Plan assigning a letter suffix to a combatant: rename the token and combatant, and apply the effect.
+   * @param {object} plan
    * @param {Combatant} combatant
    * @param {string} letter
    */
-  static async _assignSuffix(combatant, letter) {
+  static _planAssignSuffix(plan, combatant, letter) {
     const tokenDoc = combatant.token;
     if (!tokenDoc) return;
 
@@ -320,56 +329,110 @@ export class CombatMarker {
 
     log(`Assigning suffix "${letter}" to "${baseName}" → "${newName}"`);
 
-    // Update the token name
-    await tokenDoc.update({ name: newName });
-
-    // Update the combatant name and set flags in one call
-    await combatant.update({
+    this._planTokenUpdate(plan, tokenDoc, { name: newName });
+    plan.combatantUpdates.push({
+      _id: combatant.id,
       name: newName,
       [`flags.${MODULE}.${FLAGS.ORIGINAL_NAME}`]: baseName,
       [`flags.${MODULE}.${FLAGS.COMBAT_LETTER}`]: letter,
     });
-
-    // Apply the color-coded letter effect
-    await this._applyLetterEffect(combatant, letter);
+    this._planEffect(plan, combatant.actor, letter);
   }
 
   /**
-   * Remove the letter suffix from a combatant and restore its original name.
+   * Plan removing the letter suffix from a combatant and restoring its original name.
+   * @param {object} plan
    * @param {Combatant} combatant
    */
-  static async _removeSuffix(combatant) {
+  static _planRemoveSuffix(plan, combatant) {
     let originalName = combatant.getFlag(MODULE, FLAGS.ORIGINAL_NAME);
     if (!originalName) {
-      const match = combatant.name?.match(/^(.*) \[([A-Z])\]$/) ?? combatant.token?.name?.match(/^(.*) \[([A-Z])\]$/);
+      const match = combatant.name?.match(SUFFIX_PATTERN) ?? combatant.token?.name?.match(SUFFIX_PATTERN);
       if (match) {
         originalName = match[1];
       }
     }
 
-    if (!originalName) {
-      await this._removeLetterEffect(combatant);
-      return;
+    if (originalName) {
+      log(`Removing suffix from "${combatant.name}" → "${originalName}"`);
+
+      this._planTokenUpdate(plan, combatant.token, { name: originalName });
+      plan.combatantUpdates.push({
+        _id: combatant.id,
+        name: originalName,
+        [`flags.${MODULE}.-=${FLAGS.ORIGINAL_NAME}`]: null,
+        [`flags.${MODULE}.-=${FLAGS.COMBAT_LETTER}`]: null,
+      });
     }
 
-    const tokenDoc = combatant.token;
-
-    log(`Removing suffix from "${combatant.name}" → "${originalName}"`);
-
-    // Restore token name
-    if (tokenDoc) {
-      await tokenDoc.update({ name: originalName });
+    // Remove the active effect (no-op if the actor has none)
+    if (combatant.actor && this._getLetterEffects(combatant.actor).length > 0) {
+      this._planEffect(plan, combatant.actor, null);
     }
+  }
 
-    // Restore combatant name and clear flags
-    await combatant.update({
-      name: originalName,
-      [`flags.${MODULE}.-=${FLAGS.ORIGINAL_NAME}`]: null,
-      [`flags.${MODULE}.-=${FLAGS.COMBAT_LETTER}`]: null,
-    });
+  // ---------------------------------------------------------------------------
+  // Batched Writes
+  // ---------------------------------------------------------------------------
 
-    // Remove the active effect
-    await this._removeLetterEffect(combatant);
+  /**
+   * Create an empty write plan.
+   * @returns {{ tokenUpdates: Map<Scene, object[]>, combatantUpdates: object[], effects: Map<string, {actor: Actor, letter: string|null}> }}
+   */
+  static _createPlan() {
+    return {
+      tokenUpdates: new Map(),
+      combatantUpdates: [],
+      effects: new Map(),
+    };
+  }
+
+  /**
+   * Queue a token update, grouped by parent scene.
+   * @param {object} plan
+   * @param {TokenDocument} tokenDoc
+   * @param {object} changes
+   */
+  static _planTokenUpdate(plan, tokenDoc, changes) {
+    const scene = tokenDoc?.parent;
+    if (!scene) return;
+    if (!plan.tokenUpdates.has(scene)) plan.tokenUpdates.set(scene, []);
+    plan.tokenUpdates.get(scene).push({ _id: tokenDoc.id, ...changes });
+  }
+
+  /**
+   * Queue the desired letter effect for an actor (null removes it).
+   * Keyed by actor UUID so a linked actor shared by several tokens gets a single write.
+   * @param {object} plan
+   * @param {Actor} actor
+   * @param {string|null} letter
+   */
+  static _planEffect(plan, actor, letter) {
+    if (!actor) return;
+    plan.effects.set(actor.uuid, { actor, letter });
+  }
+
+  /**
+   * Commit a plan: token and combatant updates as single batched operations,
+   * followed by per-actor effect writes in parallel.
+   * @param {Combat|null} combat - Combat owning the combatant updates (null if none)
+   * @param {object} plan
+   */
+  static async _commitPlan(combat, plan) {
+    const writes = [];
+    for (const [scene, updates] of plan.tokenUpdates) {
+      writes.push(scene.updateEmbeddedDocuments('Token', updates).catch(e => {
+        console.warn(`${MODULE} | Could not update token names:`, e);
+      }));
+    }
+    if (combat && plan.combatantUpdates.length > 0) {
+      writes.push(combat.updateEmbeddedDocuments('Combatant', plan.combatantUpdates).catch(e => {
+        console.warn(`${MODULE} | Could not update combatants:`, e);
+      }));
+    }
+    await Promise.all(writes);
+
+    await Promise.all(Array.from(plan.effects.values(), ({ actor, letter }) => this._syncLetterEffect(actor, letter)));
   }
 
   // ---------------------------------------------------------------------------
@@ -377,67 +440,87 @@ export class CombatMarker {
   // ---------------------------------------------------------------------------
 
   /**
-   * Apply a color-coded letter active effect to a combatant's token actor.
-   * Creates the effect directly instead of using toggleStatusEffect so we can pass { animate: false }
-   * and correctly suppress the scrolling text on application.
-   * @param {Combatant} combatant
-   * @param {string} letter
+   * Get the token tag letter effects on an actor.
+   * @param {Actor} actor
+   * @returns {ActiveEffect[]}
    */
-  static async _applyLetterEffect(combatant, letter) {
-    const actor = combatant.actor;
-    if (!actor) return;
+  static _getLetterEffects(actor) {
+    return actor.effects.filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER));
+  }
 
-    // Remove any existing token tag effects first
-    await this._removeLetterEffect(combatant);
+  /**
+   * Ensure an actor carries exactly the letter effect for `letter` (or none if null).
+   * An existing letter effect is updated in place rather than deleted and re-created.
+   * Effects are written directly (not via toggleStatusEffect) so we can pass { animate: false }
+   * and correctly suppress the scrolling text.
+   * @param {Actor} actor
+   * @param {string|null} letter
+   */
+  static async _syncLetterEffect(actor, letter) {
+    const [existing, ...extra] = this._getLetterEffects(actor);
 
-    const statusId = `${MODULE}.${letter}`;
-    const iconPath = IconGenerator.getEffectIconPath(letter);
+    try {
+      if (!letter) {
+        if (existing) {
+          await actor.deleteEmbeddedDocuments('ActiveEffect', [existing.id, ...extra.map(e => e.id)], { animate: false });
+        }
+        return;
+      }
 
+      if (extra.length > 0) {
+        await actor.deleteEmbeddedDocuments('ActiveEffect', extra.map(e => e.id), { animate: false });
+      }
+
+      const effectData = this._buildEffectData(letter);
+      if (existing) {
+        await existing.update(effectData, { animate: false });
+      } else {
+        await actor.createEmbeddedDocuments('ActiveEffect', [effectData], { animate: false });
+      }
+      log(`Applied letter effect "${letter}" to actor "${actor.name}" with icon "${effectData.img}"`);
+    } catch (error) {
+      console.error(`${MODULE} | Failed to sync status effect for letter "${letter}":`, error);
+    }
+  }
+
+  /**
+   * Build the ActiveEffect data for a letter.
+   * @param {string} letter
+   * @returns {object}
+   */
+  static _buildEffectData(letter) {
     const effectData = {
       name: letter,
-      img: iconPath,
-      statuses: [statusId],
+      img: IconGenerator.getEffectIconPath(letter),
+      statuses: [`${MODULE}.${letter}`],
       flags: {
         [MODULE]: {
           [FLAGS.COMBAT_LETTER]: letter
         }
       }
     };
-    
+
     // V14+: Ensure the effect always displays on the token HUD even without a duration
     if (globalThis.CONST?.ACTIVE_EFFECT_SHOW_ICON) {
       effectData.showIcon = globalThis.CONST.ACTIVE_EFFECT_SHOW_ICON.ALWAYS ?? 2;
     }
-
-    try {
-      await actor.createEmbeddedDocuments('ActiveEffect', [effectData], { animate: false });
-      log(`Applied letter effect "${letter}" to actor "${actor.name}" with icon "${iconPath}"`);
-    } catch (error) {
-      console.error(`${MODULE} | Failed to create status effect for letter "${letter}":`, error);
-    }
-  }
-
-  /**
-   * Remove any token tag letter effects from the combatant's actor.
-   * Only removes effects that have our module flag set.
-   * @param {Combatant} combatant
-   */
-  static async _removeLetterEffect(combatant) {
-    const actor = combatant.actor;
-    if (!actor) return;
-
-    const effectIds = actor.effects
-      .filter(e => e.getFlag(MODULE, FLAGS.COMBAT_LETTER))
-      .map(e => e.id);
-
-    if (effectIds.length > 0) {
-      await actor.deleteEmbeddedDocuments('ActiveEffect', effectIds, { animate: false });
-    }
+    return effectData;
   }
 
   // ---------------------------------------------------------------------------
   // Utility
   // ---------------------------------------------------------------------------
+
+  /**
+   * Whether this client should perform document writes. With multiple GMs connected,
+   * only the designated active GM processes combats so work isn't duplicated.
+   * @returns {boolean}
+   */
+  static _isResponsibleGM() {
+    if (!game.user.isGM) return false;
+    const activeGM = game.users.activeGM;
+    return activeGM ? activeGM.isSelf : true;
+  }
 
   /**
    * Check if a combatant is an NPC.
@@ -490,15 +573,5 @@ export class CombatMarker {
    */
   static _getEnemyNPCs(combat) {
     return combat.combatants.filter(c => this._isEnemyNPC(c));
-  }
-
-  /**
-   * Get all enemy NPC combatants in a combat that share the given actorId.
-   * @param {Combat} combat
-   * @param {string} actorId
-   * @returns {Combatant[]}
-   */
-  static _getActorGroup(combat, actorId) {
-    return combat.combatants.filter(c => c.actorId === actorId && this._isEnemyNPC(c));
   }
 }
