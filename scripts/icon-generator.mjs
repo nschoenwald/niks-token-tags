@@ -126,11 +126,10 @@ export class IconGenerator {
     if (!overwrite) {
       try {
         const directory = await FilePicker.browse(ACTIVE_SOURCE, this.getDirectoryPath());
-        const exists = directory.files.some(f => f.endsWith(`/${this.getFileName(letter)}`) || f === this.getFilePath(letter));
-        if (exists) {
+        const existingPath = directory.files.find(f => this._isLetterFile(f, letter));
+        if (existingPath) {
           // File already exists — store its path for reference
-          const existingPath = directory.files.find(f => f.endsWith(`/${this.getFileName(letter)}`) || f === this.getFilePath(letter));
-          if (existingPath) this._uploadedPaths.set(letter, existingPath);
+          this._uploadedPaths.set(letter, existingPath);
           return;
         }
       } catch (e) {
@@ -158,23 +157,43 @@ export class IconGenerator {
    * @param {boolean} [overwrite=false]
    */
   static async generateAllIcons(overwrite = false) {
-    await this.createDirectory();
-    const colors = Settings.getColors();
-    for (const letter of LETTERS) {
-      const letterColors = colors[letter] ?? { bg: '#757575', text: '#FFFFFF' };
-      await this.saveLetterIcon(letter, letterColors, overwrite);
-    }
-    this.refreshImages();
-
-    // Verify uploads by browsing the directory
+    // Browse the directory once (instead of once per letter); create it only if it's missing
+    let existingFiles = null;
     try {
       const directory = await FilePicker.browse(ACTIVE_SOURCE, this.getDirectoryPath());
-      log(`Icon directory contains ${directory.files.length} files:`, directory.files);
+      existingFiles = directory.files;
     } catch (e) {
-      console.warn(`${MODULE} | Could not browse icon directory after generation:`, e);
+      await this.createDirectory();
     }
 
-    log('All letter icons generated.');
+    const colors = Settings.getColors();
+    const missing = [];
+    for (const letter of LETTERS) {
+      const existingPath = overwrite ? null : existingFiles?.find(f => this._isLetterFile(f, letter));
+      if (existingPath) {
+        this._uploadedPaths.set(letter, existingPath);
+      } else {
+        missing.push(letter);
+      }
+    }
+
+    await Promise.all(missing.map(letter => {
+      const letterColors = colors[letter] ?? { bg: '#757575', text: '#FFFFFF' };
+      return this.saveLetterIcon(letter, letterColors, true);
+    }));
+    this.refreshImages();
+
+    log(`Letter icons ready (${missing.length} generated, ${LETTERS.length - missing.length} existing).`);
+  }
+
+  /**
+   * Whether a browsed file path is the icon file for a letter.
+   * @param {string} filePath
+   * @param {string} letter
+   * @returns {boolean}
+   */
+  static _isLetterFile(filePath, letter) {
+    return filePath.endsWith(`/${this.getFileName(letter)}`) || filePath === this.getFilePath(letter);
   }
 
   /**

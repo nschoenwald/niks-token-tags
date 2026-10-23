@@ -1,4 +1,4 @@
-import { MODULE } from './const.mjs';
+import { MODULE, setDebug } from './const.mjs';
 
 /**
  * Default color palette for letters A–Z.
@@ -100,7 +100,9 @@ export class Settings {
       config: true,
       type: Boolean,
       default: false,
+      onChange: setDebug,
     });
+    setDebug(game.settings.get(MODULE, this.DEBUG));
 
     game.settings.register(MODULE, this.COLORS, {
       scope: 'world',
