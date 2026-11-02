@@ -1,0 +1,45 @@
+{
+  "niks-token-tags": {
+    "settings": {
+      "enabled": {
+        "Name": "Token Tagsを有効化",
+        "Hint": "戦闘中に重複するNPCトークンへ自動的にアルファベットの接尾辞を付けて名前を変え、色分けされたエフェクトを適用します。"
+      },
+      "uniqueLetters": {
+        "Name": "文字を全体で重複させない",
+        "Hint": "有効にすると、戦闘中のすべての種類のNPCで重複しない文字を割り当てます（例: ゴブリンA、ホブゴブリンB）。無効にすると、文字はアクターの種類ごとになります（例: ゴブリンA、ホブゴブリンA）。"
+      },
+      "includeSingletons": {
+        "Name": "単独のクリーチャーにも文字を付ける",
+        "Hint": "有効にすると、戦闘中にその種類が1体だけのクリーチャーにも文字が付きます（例: ボスA）。無効にすると、同じ種類が複数いるクリーチャーだけに文字が付きます。"
+      },
+      "restoreOnCombatEnd": {
+        "Name": "戦闘終了時に名前を戻す",
+        "Hint": "戦闘が削除されたときに、トークンの元の名前を戻し、文字エフェクトを削除します。"
+      },
+      "iconDirectory": {
+        "Name": "アイコン保存フォルダ",
+        "Hint": "生成された文字アイコンを保存するユーザーデータ内のフォルダです。変更には再読み込みが必要です。"
+      },
+      "colorConfigMenu": {
+        "Name": "文字の色設定",
+        "Label": "色を設定",
+        "Hint": "各文字マーカーの背景色と文字色をカスタマイズします。"
+      },
+      "debug": {
+        "Name": "デバッグログ",
+        "Hint": "詳細なコンソールログを有効にします。トラブルシューティングに便利です。"
+      }
+    },
+    "colorConfig": {
+      "title": "Token Tags — 文字の色",
+      "letterHeader": "文字",
+      "bgColorHeader": "背景",
+      "bgHexHeader": "Hex",
+      "textColorHeader": "テキスト",
+      "textHexHeader": "Hex",
+      "previewHeader": "プレビュー",
+      "resetDefaults": "初期値に戻す"
+    }
+  }
+}

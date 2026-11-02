@@ -44,6 +44,12 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 4. Both the token name (on the canvas) and the combatant name (in the combat tracker) are updated.
 5. If combatants are removed until only a single enemy NPC remains, its tag and active effect are automatically removed.
 
+## Languages
+
+English, Deutsch, Français, Español, Italiano, Português (Brasil), 日本語, Polski and Čeština.
+
+All translations were written with AI help and may contain mistakes. Corrections are welcome as an issue or pull request.
+
 ## Credits
 
 The icon generation and active effect system in this module is inspired by and adapted from [Token Color Marker](https://github.com/Gundancer/foundryvtt-token-color-marker) by **Gundancer**. Thank you for the excellent reference implementation!
