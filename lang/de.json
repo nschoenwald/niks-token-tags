@@ -1,0 +1,45 @@
+{
+  "niks-token-tags": {
+    "settings": {
+      "enabled": {
+        "Name": "Token Tags aktivieren",
+        "Hint": "Benennt doppelte NSC-Token im Kampf automatisch mit alphabetischen Zusätzen um und versieht sie mit farbcodierten Effekten."
+      },
+      "uniqueLetters": {
+        "Name": "Buchstaben global eindeutig",
+        "Hint": "Wenn aktiviert, werden Buchstaben über alle NSC-Arten im Kampf hinweg eindeutig vergeben (z. B. Goblin A, Hobgoblin B). Wenn deaktiviert, gelten die Buchstaben je Akteur-Art (z. B. Goblin A, Hobgoblin A)."
+      },
+      "includeSingletons": {
+        "Name": "Einzelne Kreaturen beschriften",
+        "Hint": "Wenn aktiviert, erhalten auch Kreaturen einen Buchstaben, die als einzige ihrer Art im Kampf sind (z. B. Boss A). Wenn deaktiviert, erhalten nur Kreaturen mit Duplikaten derselben Art Buchstaben."
+      },
+      "restoreOnCombatEnd": {
+        "Name": "Namen bei Kampfende wiederherstellen",
+        "Hint": "Stellt beim Löschen des Kampfes die ursprünglichen Token-Namen wieder her und entfernt die Buchstaben-Effekte."
+      },
+      "iconDirectory": {
+        "Name": "Speicherordner für Symbole",
+        "Hint": "Ordner in den Benutzerdaten, in dem die erzeugten Buchstabensymbole gespeichert werden. Eine Änderung erfordert ein Neuladen."
+      },
+      "colorConfigMenu": {
+        "Name": "Buchstabenfarben",
+        "Label": "Farben konfigurieren",
+        "Hint": "Passt die Hintergrund- und Textfarben jeder Buchstabenmarkierung an."
+      },
+      "debug": {
+        "Name": "Debug-Protokollierung",
+        "Hint": "Ausführliche Konsolenausgaben aktivieren. Hilfreich bei der Fehlersuche."
+      }
+    },
+    "colorConfig": {
+      "title": "Token Tags – Buchstabenfarben",
+      "letterHeader": "Buchstabe",
+      "bgColorHeader": "Hintergrund",
+      "bgHexHeader": "Hex",
+      "textColorHeader": "Text",
+      "textHexHeader": "Hex",
+      "previewHeader": "Vorschau",
+      "resetDefaults": "Auf Standard zurücksetzen"
+    }
+  }
+}

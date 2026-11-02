@@ -1,0 +1,45 @@
+{
+  "niks-token-tags": {
+    "settings": {
+      "enabled": {
+        "Name": "Zapnout Token Tags",
+        "Hint": "Automaticky přejmenuje duplicitní žetony CP v souboji pomocí abecedních přípon a použije barevně odlišené efekty."
+      },
+      "uniqueLetters": {
+        "Name": "Písmena jedinečná globálně",
+        "Hint": "Je-li zapnuto, přiděluje jedinečná písmena napříč všemi typy CP v souboji (např. Goblin A, Hobgoblin B). Je-li vypnuto, písmena se přidělují pro každý typ aktéra zvlášť (např. Goblin A, Hobgoblin A)."
+      },
+      "includeSingletons": {
+        "Name": "Označit i jedinečné tvory",
+        "Hint": "Je-li zapnuto, dostanou písmeno i tvorové, kteří jsou jediní svého typu v souboji (např. Boss A). Je-li vypnuto, dostanou písmena jen tvorové s duplikáty stejného typu."
+      },
+      "restoreOnCombatEnd": {
+        "Name": "Obnovit jména po konci souboje",
+        "Hint": "Po smazání souboje obnoví původní jména žetonů a odstraní efekty písmen."
+      },
+      "iconDirectory": {
+        "Name": "Složka pro ikony",
+        "Hint": "Složka v uživatelských datech, kam se ukládají vygenerované ikony písmen. Změna vyžaduje opětovné načtení."
+      },
+      "colorConfigMenu": {
+        "Name": "Barvy písmen",
+        "Label": "Nastavit barvy",
+        "Hint": "Přizpůsobí barvy pozadí a textu každé písmenné značky."
+      },
+      "debug": {
+        "Name": "Ladicí výpisy",
+        "Hint": "Zapne podrobné výpisy do konzole. Užitečné při řešení problémů."
+      }
+    },
+    "colorConfig": {
+      "title": "Token Tags — Barvy písmen",
+      "letterHeader": "Písmeno",
+      "bgColorHeader": "Pozadí",
+      "bgHexHeader": "Hex",
+      "textColorHeader": "Text",
+      "textHexHeader": "Hex",
+      "previewHeader": "Náhled",
+      "resetDefaults": "Obnovit výchozí"
+    }
+  }
+}
