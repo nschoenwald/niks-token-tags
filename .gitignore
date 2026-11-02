@@ -8,6 +8,3 @@
 *.md
 !README.md
 !CHANGELOG.md
-
-# Third-party module kept locally for reference
-_references/
