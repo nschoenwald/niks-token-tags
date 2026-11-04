@@ -46,9 +46,9 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 
 ## Languages
 
-🇬🇧 English · 🇩🇪 Deutsch · 🇫🇷 Français · 🇪🇸 Español · 🇮🇹 Italiano · 🇧🇷 Português (Brasil) · 🇯🇵 日本語 · 🇵🇱 Polski · 🇨🇿 Čeština
+🇬🇧 English · 🇩🇪 Deutsch
 
-All translations were written with AI help and may contain mistakes. Corrections are welcome as an issue or pull request.
+Translations into other languages by native speakers are welcome as an issue or pull request.
 
 ## Credits
 

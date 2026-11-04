@@ -1,5 +1,9 @@
 # Changelog
 
+## 14.3.1
+
+- Removed the French, Spanish, Italian, Brazilian Portuguese, Japanese, Polish and Czech translations. They were machine-translated and never checked by a native speaker. Players who use Foundry in one of these languages now see this module in English. Translations by native speakers are welcome as an issue or pull request.
+
 ## 14.3.0
 
 - The module is now available in German, French, Spanish, Italian, Brazilian Portuguese, Japanese, Polish and Czech.
