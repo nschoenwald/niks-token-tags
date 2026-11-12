@@ -31,7 +31,7 @@ A [Foundry VTT](https://foundryvtt.com/) module that automatically renames dupli
 |---------|---------|-------------|
 | **Enable Token Tags** | ✅ On | Master toggle for the module |
 | **Unique Letters Globally** | ✅ On | Assigns unique letters across all types of NPCs in the combat (e.g. Goblin [A], Hobgoblin [B]) rather than per actor type |
-| **Letter Unique Creatures** | ✅ On | When multiple enemies are in combat, unique creature types (singletons) also receive letters (e.g. Boss [A], Goblin [B]) |
+| **Letter Unique Creatures** | ❌ Off | When multiple enemies are in combat, unique creature types (singletons) also receive letters (e.g. Boss [A], Goblin [B]) |
 | **Restore Names on Combat End** | ✅ On | Restore original token names and remove letter effects when combat is deleted |
 | **Icon Storage Directory** | `assets/niks-token-tags` | Directory in user data where generated letter icons are stored |
 | **Configure Colors** | — | Opens a configuration menu to customize the background and text color for each letter A–Z |

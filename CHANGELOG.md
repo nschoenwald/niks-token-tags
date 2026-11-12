@@ -1,5 +1,9 @@
 # Changelog
 
+## 14.3.2
+
+- **Letter Unique Creatures** is now off by default: a creature that is the only one of its kind in combat keeps its name without a letter. Worlds where this setting was already changed keep their choice.
+
 ## 14.3.1
 
 - Removed the French, Spanish, Italian, Brazilian Portuguese, Japanese, Polish and Czech translations. They were machine-translated and never checked by a native speaker. Players who use Foundry in one of these languages now see this module in English. Translations by native speakers are welcome as an issue or pull request.

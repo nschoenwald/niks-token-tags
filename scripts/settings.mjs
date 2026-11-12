@@ -71,7 +71,7 @@ export class Settings {
       scope: 'world',
       config: true,
       type: Boolean,
-      default: true,
+      default: false,
     });
 
     game.settings.register(MODULE, this.RESTORE_ON_COMBAT_END, {
