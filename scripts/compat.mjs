@@ -46,6 +46,12 @@ export class Compatibility {
   /** Cache of actor → letter from its token tag effect (null if none). */
   static _effectLetterCache = new WeakMap();
 
+  /** Bumped whenever a letter lookup is invalidated, so checked nameplates are checked again. */
+  static _letterVersion = 0;
+
+  /** Token → what its nameplate was last checked against: `{ text, name, combat, version }`. */
+  static _nameplateChecks = new WeakMap();
+
   /** Cache of compiled chat censor patterns keyed by hideParts flag and name. */
   static _chatPatternCache = new Map();
 
@@ -307,12 +313,12 @@ export class Compatibility {
    * These hooks fire on every client, so players' caches stay current too.
    */
   static _registerCacheHooks() {
-    const invalidateIndex = () => { this._letterIndex = null; };
+    const invalidateIndex = () => { this._letterIndex = null; this._letterVersion++; };
     for (const hook of ['createCombatant', 'updateCombatant', 'deleteCombatant', 'deleteCombat']) {
       Hooks.on(hook, invalidateIndex);
     }
 
-    const invalidateEffects = () => { this._effectLetterCache = new WeakMap(); };
+    const invalidateEffects = () => { this._effectLetterCache = new WeakMap(); this._letterVersion++; };
     for (const hook of ['createActiveEffect', 'updateActiveEffect', 'deleteActiveEffect', 'updateActor']) {
       Hooks.on(hook, invalidateEffects);
     }
@@ -370,12 +376,29 @@ export class Compatibility {
   }
 
   /**
-   * Ensure the canvas nameplate includes the letter tag suffix.
+   * Ensure the canvas nameplate includes the letter tag suffix. `refreshToken` fires on every frame of a movement,
+   * so the lookup is skipped while the nameplate text, the token's name and the letter data are unchanged.
    * @param {Token} token
    */
   static _fixTokenNameplate(token) {
     if (!token?.nameplate || typeof token.nameplate.text !== 'string') return;
 
+    const name = token.document?._source?.name;
+    const combat = globalThis.game?.combat ?? null;
+    const version = this._letterVersion;
+    const checked = this._nameplateChecks.get(token);
+    if (checked && (checked.text === token.nameplate.text) && (checked.name === name)
+      && (checked.combat === combat) && (checked.version === version)) return;
+
+    this._applyNameplateLetter(token);
+    this._nameplateChecks.set(token, { text: token.nameplate.text, name, combat, version });
+  }
+
+  /**
+   * Add the letter tag suffix to a canvas nameplate if it is missing.
+   * @param {Token} token
+   */
+  static _applyNameplateLetter(token) {
     const letter = this.extractLetter(token);
     if (!letter) return;
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 14.3.3
+
+- **Performance:** with Hide NPC Names active, token nameplates are no longer re-checked on every frame while tokens move.
+
 ## 14.3.2
 
 - **Letter Unique Creatures** is now off by default: a creature that is the only one of its kind in combat keeps its name without a letter. Worlds where this setting was already changed keep their choice.
