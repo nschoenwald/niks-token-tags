@@ -1,5 +1,9 @@
 # Changelog
 
+## 14.4.0
+
+- The module is now available in French, reviewed by Kameleau. Thank you!
+
 ## 14.3.3
 
 - **Performance:** with Hide NPC Names active, token nameplates are no longer re-checked on every frame while tokens move.
